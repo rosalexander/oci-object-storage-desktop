@@ -1,0 +1,16 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+
+[packages]
+fbs = "*"
+pyside2 = "==5.12.0"
+pyinstaller = "==3.4"
+requests = "*"
+oci = "*"
+
+[requires]
+python_version = "3.5"
