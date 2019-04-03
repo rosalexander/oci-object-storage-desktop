@@ -6,6 +6,7 @@ from PySide2.QtWidgets import QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLa
 import oci
 import requests
 import sys
+import os
 
 class AppContext(ApplicationContext):
     def run(self):
@@ -177,7 +178,7 @@ class MainWindow(QWidget):
     def get_objects_tree(self, bucket_name):
         namespace = self.oci_manager.get_namespace()
 
-        treeWidget = Tree(accept_drop=True)
+        treeWidget = Tree(accept_drop=True, bucket_name=bucket_name, oci_manager=self.oci_manager)
         treeWidget.setColumnCount(2)
         treeWidget.setHeaderLabels(['Objects', 'Size'])
 
@@ -207,7 +208,7 @@ class MainWindow(QWidget):
         tree_item.setText(0, text)
         tree_item.setTextColor(0, QColor(220,220,220))
         return tree_widget
-        
+
 
 class Form(QDialog):
     def __init__(self, parent=None):
@@ -222,13 +223,13 @@ class Form(QDialog):
         self.setLayout(layout)
 
 class Tree(QTreeWidget):
-    def __init__(self, accept_drop=False, compartment_id=None, bucket_name=None):
+    def __init__(self, accept_drop=False, bucket_name=None, oci_manager=None):
         super(Tree, self).__init__()
         # self.setDefaultDropAction(Qt.MoveAction)
         # self.setDragDropMode(QAbstractItemView.DragDrop)
         self.setAcceptDrops(accept_drop)
-        self.compartment_id = compartment_id
         self.bucket_name = bucket_name
+        self.oci_manager = oci_manager
 
     
     def dragEnterEvent(self, e):
@@ -245,8 +246,28 @@ class Tree(QTreeWidget):
 
     def dropEvent(self, e):
         for url in e.mimeData().urls():
-            file_name = url.toLocalFile()
-            print("Dropped file: " + file_name)
+            file = url.toLocalFile()
+            print("Dropped file: " + file)
+            if os.path.isfile(file):
+                if self.oci_manager and self.bucket_name:
+                    with open(file, 'rb') as file_object:
+                        self.oci_manager.get_os().put_object(self.oci_manager.get_namespace(), self.bucket_name, file.split('/')[-1], file_object.read())
+            elif os.path.isdir(file):
+                split_dir = file.split('/')
+                dir_length = len(file) - len(split_dir[-2]) - 1
+                root_dir = True
+                for dir, _, filenames in os.walk(file):
+                    for filename in filenames:
+                        subfile = "{}/{}".format(dir, filename) if not root_dir else "{}{}".format(dir, filename)
+                        print(subfile[dir_length:])
+                        with open(subfile, 'rb') as file_object:
+                            self.oci_manager.get_os().put_object(self.oci_manager.get_namespace(), self.bucket_name, subfile[dir_length:], file_object.read())
+                    root_dir = False
+
+
+
+
+
             
 
 class oci_manager():
@@ -260,7 +281,6 @@ class oci_manager():
         self.os_client = oci.object_storage.ObjectStorageClient(self.config)
         self.tenancy = self.config['tenancy']
         self.namespace = self.os_client.get_namespace().data
-
         self.compartments = []
         self.objects = []
     
