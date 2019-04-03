@@ -25,12 +25,10 @@ class MainWindow(QWidget):
         self.setMinimumSize(800, 600)
         self.setWindowTitle("OCI Object Storage")
 
+        self.oci_manager = oci_manager()
         self.treeWidget = self.get_compartment_tree()
         self.bucket_tree = self.get_placeholder_tree('Buckets', 'No compartment selected')
         self.obj_tree = self.get_placeholder_tree('Objects', 'No bucket selected')
-        
-
-        self.oci_manager = oci_manager()
 
         button = QPushButton('Upload Files')
         button.clicked.connect(self.select_files)
@@ -90,19 +88,15 @@ class MainWindow(QWidget):
 
     
     def upload_files(self, files, bucket_name):
-        config = oci.config.from_file(profile_name='RED')
-        object_storage = oci.object_storage.ObjectStorageClient(config)
-        namespace = object_storage.get_namespace().data
+        namespace = self.oci_manager.get_namespace()
         for file in files[0]:
             with open(file, 'rb') as file_object:
-                object_storage.put_object(namespace, bucket_name, file.split('/')[-1], file_object.read())
+                self.oci_manager.get_os().put_object(namespace, bucket_name, file.split('/')[-1], file_object.read())
 
     def get_compartment_tree(self):
-        config = oci.config.from_file(profile_name='RED')
-        id = oci.identity.IdentityClient(config)
-        root = 'ocid1.tenancy.oc1..aaaaaaaajehugl3ryss2gaxf3os7g5w4xdztfhy4coqnoizm2wpmrclnv5da'
 
-        compartments = id.list_compartments(root, compartment_id_in_subtree=True)
+        root = self.oci_manager.get_tenancy()
+        compartments = self.oci_manager.get_id().list_compartments(root, compartment_id_in_subtree=True)
 
         data = compartments.data
 
@@ -111,7 +105,7 @@ class MainWindow(QWidget):
         tree_dic = {}
 
         while compartments.next_page:
-            compartments = id.list_compartments(root, compartment_id_in_subtree=True, page=compartments.next_page)
+            compartments = self.oci_manager.get_id().list_compartments(root, compartment_id_in_subtree=True, page=compartments.next_page)
             data += compartments.data
 
         for compartment in data:
@@ -122,16 +116,13 @@ class MainWindow(QWidget):
                 else:
                     hierarchy[compartment.compartment_id] = [compartment.id]
 
-        stack = [root]
-
         treeWidget = Tree()
         treeWidget.setHeaderLabels(['Compartments', 'OCID'])
-
-
         tree_dic[root] = QTreeWidgetItem(treeWidget)
         tree_dic[root].setText(0, '(root)')
         tree_dic[root].setText(1, root)
 
+        stack = [root]
         while stack:
             compartment_id = stack.pop()
             parent_tree = tree_dic[compartment_id]
@@ -156,7 +147,6 @@ class MainWindow(QWidget):
         self.obj_tree.setParent(None)
         self.obj_tree = self.get_placeholder_tree('Objects', 'No bucket selected')
         self.layout.insertWidget(3, self.obj_tree)
-
     
     def select_bucket(self, item):
         self.layout.removeItem(self.layout.itemAt(3))
@@ -166,14 +156,11 @@ class MainWindow(QWidget):
         
     
     def get_buckets_tree(self, ocid):
-        config = oci.config.from_file(profile_name='RED')
-        object_storage = oci.object_storage.ObjectStorageClient(config)
-        namespace = object_storage.get_namespace().data
-
+        namespace = self.oci_manager.get_namespace()
         treeWidget = Tree()
         treeWidget.setHeaderLabel('Buckets')
 
-        data = object_storage.list_buckets(namespace, ocid).data
+        data = self.oci_manager.get_os().list_buckets(namespace, ocid).data
 
         if not data:
             bucket_tree = QTreeWidgetItem(treeWidget)
@@ -188,9 +175,7 @@ class MainWindow(QWidget):
         return treeWidget
     
     def get_objects_tree(self, bucket_name):
-        config = oci.config.from_file(profile_name='RED')
-        object_storage = oci.object_storage.ObjectStorageClient(config)
-        namespace = object_storage.get_namespace().data
+        namespace = self.oci_manager.get_namespace()
 
         treeWidget = Tree(accept_drop=True)
         treeWidget.setColumnCount(2)
@@ -198,7 +183,7 @@ class MainWindow(QWidget):
 
         byte_type = ['KB', 'MB', 'GB', 'PB']
 
-        data = object_storage.list_objects(namespace, bucket_name, fields='size').data.objects
+        data = self.oci_manager.get_os().list_objects(namespace, bucket_name, fields='size').data.objects
 
         for obj in data:
             print(obj.name)
@@ -222,17 +207,7 @@ class MainWindow(QWidget):
         tree_item.setText(0, text)
         tree_item.setTextColor(0, QColor(220,220,220))
         return tree_widget
-
-    def get_tenancy(self):
-        if not self.tenancy:
-            self.tenancy = self.get_id_client().get_tenancy(self.get_config['tenancy']).data
-        return self.tenancy
-
-    def get_config(self):
-        if not self.config:
-            self.config = oci.config.from_file(profile_name='RED')
-        return self.config
-
+        
 
 class Form(QDialog):
     def __init__(self, parent=None):
@@ -301,10 +276,9 @@ class oci_manager():
     def get_namespace(self):
         return self.namespace
     
+    def get_tenancy(self):
+        return self.tenancy
     
-    
-            
-
 
 if __name__ == '__main__':
     appctxt = AppContext()
