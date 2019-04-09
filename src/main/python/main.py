@@ -2,7 +2,7 @@ from fbs_runtime.application_context import ApplicationContext, cached_property
 from PySide2.QtCore import Qt, SIGNAL, QObject, QTextCodec
 from PySide2.QtGui import QColor
 
-from PySide2.QtWidgets import QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QTreeWidget, QTreeWidgetItem, QDialogButtonBox, QDialog, QLineEdit, QAbstractItemView
+from PySide2.QtWidgets import QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QTreeWidget, QTreeWidgetItem, QDialogButtonBox, QDialog, QLineEdit, QAbstractItemView, QMenuBar, QMenu, QAction
 import oci
 import requests
 import sys
@@ -13,10 +13,15 @@ class AppContext(ApplicationContext):
         stylesheet = self.get_resource('styles.qss')
         self.app.setStyleSheet(open(stylesheet).read())
         self.window.show()
+        self.menu.show()
         return self.app.exec_()
     @cached_property
     def window(self):
         return MainWindow()
+    @cached_property
+    def menu(self):
+        return MainMenu()
+    
 
 class MainWindow(QWidget):
     
@@ -24,10 +29,17 @@ class MainWindow(QWidget):
         super().__init__()
         
         self.setMinimumSize(800, 600)
-        self.setWindowTitle("OCI Object Storage")
+        self.setWindowTitle("OCI Object Storage: Not Connected")
 
         self.oci_manager = oci_manager()
-        self.treeWidget = self.get_compartment_tree()
+
+        try:
+            self.treeWidget = self.get_compartment_tree()
+        except oci.exceptions.RequestException:
+            self.treeWidget = self.get_placeholder_tree('Compartments', 'Error: Failure to establish connection')
+        else:
+            self.setWindowTitle("OCI Object Storage: {}".format(self.oci_manager.get_namespace()))
+
         self.bucket_tree = self.get_placeholder_tree('Buckets', 'No compartment selected')
         self.obj_tree = self.get_placeholder_tree('Objects', 'No bucket selected')
 
@@ -37,8 +49,8 @@ class MainWindow(QWidget):
         button2 = QPushButton('New Bucket')
         button2.clicked.connect(self.create_bucket_prompt)
 
-        button3 = QPushButton('Delete Files')
-        button3.clicked.connect(self.select_files)
+        button3 = QPushButton('Refresh')
+        button3.clicked.connect(self.refresh)
 
         buttonBox = QDialogButtonBox()
         buttonBox.setOrientation(Qt.Vertical)
@@ -54,6 +66,15 @@ class MainWindow(QWidget):
         self.layout.addWidget(self.bucket_tree)
         self.layout.addWidget(self.obj_tree)
         self.setLayout(self.layout)
+    
+    def refresh(self):
+        self.oci_manager = oci_manager()
+        try:
+            self.treeWidget = self.get_compartment_tree()
+        except oci.exceptions.RequestException:
+            self.treeWidget = self.get_placeholder_tree('Compartments', 'Error: Failure to establish connection')
+        self.bucket_tree = self.get_placeholder_tree('Buckets', 'No compartment selected')
+        self.obj_tree = self.get_placeholder_tree('Objects', 'No bucket selected')
     
     def select_files(self):
         buckets = self.bucket_tree.selectedItems()
@@ -264,23 +285,20 @@ class Tree(QTreeWidget):
                             self.oci_manager.get_os().put_object(self.oci_manager.get_namespace(), self.bucket_name, subfile[dir_length:], file_object.read())
                     root_dir = False
 
-
-
-
-
-            
-
 class oci_manager():
     def __init__(self, config=None):
         if not config:
             self.config = oci.config.from_file(profile_name='RED')
         else:
             self.config = config
-        
         self.id_client = oci.identity.IdentityClient(self.config)
         self.os_client = oci.object_storage.ObjectStorageClient(self.config)
         self.tenancy = self.config['tenancy']
-        self.namespace = self.os_client.get_namespace().data
+
+        try:
+            self.namespace = self.os_client.get_namespace().data
+        except oci.exceptions.RequestException:
+            print("Error: Failure to establish connection", sys.exc_info()[0])
         self.compartments = []
         self.objects = []
     
@@ -298,7 +316,24 @@ class oci_manager():
     
     def get_tenancy(self):
         return self.tenancy
-    
+
+class MainMenu(QMenuBar):
+    def __init__(self):
+        super(MainMenu, self).__init__()
+        self.setNativeMenuBar(True)
+        test_menu = self.addMenu('&Test')
+        for text in ["About", "Preferences"]:
+            action = test_menu.addAction(text)
+            action.setMenuRole(QAction.ApplicationSpecificRole)
+        
+        self.file_menu = self.addMenu('&File')
+        self.file_menu.addAction("Hello")
+        self.edit_menu = self.addMenu('&Edit')
+        self.edit_menu.addAction("There")
+        self.view_menu = self.addMenu('&View')
+        self.view_menu.addAction("Obi-Wan")
+
+
 
 if __name__ == '__main__':
     appctxt = AppContext()

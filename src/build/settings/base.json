@@ -1,6 +1,6 @@
 {
-    "app_name": "MyApp",
-    "author": "Alros",
+    "app_name": "OCI Object Storage",
+    "author": "Alexander Ros",
     "main_module": "src/main/python/main.py",
     "version": "0.0.0"
 }
