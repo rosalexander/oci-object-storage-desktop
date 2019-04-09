@@ -1,10 +1,8 @@
 from fbs_runtime.application_context import ApplicationContext, cached_property
 from PySide2.QtCore import Qt, SIGNAL, QObject, QTextCodec
 from PySide2.QtGui import QColor
-
 from PySide2.QtWidgets import QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QTreeWidget, QTreeWidgetItem, QDialogButtonBox, QDialog, QLineEdit, QAbstractItemView, QMenuBar, QMenu, QAction
-import oci
-import requests
+from oci_manager import oci_manager
 import sys
 import os
 
@@ -285,37 +283,7 @@ class Tree(QTreeWidget):
                             self.oci_manager.get_os().put_object(self.oci_manager.get_namespace(), self.bucket_name, subfile[dir_length:], file_object.read())
                     root_dir = False
 
-class oci_manager():
-    def __init__(self, config=None):
-        if not config:
-            self.config = oci.config.from_file(profile_name='RED')
-        else:
-            self.config = config
-        self.id_client = oci.identity.IdentityClient(self.config)
-        self.os_client = oci.object_storage.ObjectStorageClient(self.config)
-        self.tenancy = self.config['tenancy']
 
-        try:
-            self.namespace = self.os_client.get_namespace().data
-        except oci.exceptions.RequestException:
-            print("Error: Failure to establish connection", sys.exc_info()[0])
-        self.compartments = []
-        self.objects = []
-    
-    def get_config(self):
-        return self.config
-    
-    def get_id(self):
-        return self.id_client
-    
-    def get_os(self):
-        return self.os_client
-    
-    def get_namespace(self):
-        return self.namespace
-    
-    def get_tenancy(self):
-        return self.tenancy
 
 class MainMenu(QMenuBar):
     def __init__(self):
