@@ -3,6 +3,7 @@ from PySide2.QtCore import Qt, SIGNAL, QObject, QTextCodec
 from PySide2.QtGui import QColor
 from PySide2.QtWidgets import QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QTreeWidget, QTreeWidgetItem, QDialogButtonBox, QDialog, QLineEdit, QAbstractItemView, QMenuBar, QMenu, QAction
 from oci_manager import oci_manager
+from config import ConfigWindow
 import sys
 import os
 
@@ -288,6 +289,7 @@ class Tree(QTreeWidget):
 class MainMenu(QMenuBar):
     def __init__(self):
         super(MainMenu, self).__init__()
+        self.config_window = None
         self.setNativeMenuBar(True)
         test_menu = self.addMenu('&Test')
         for text in ["About", "Preferences"]:
@@ -295,11 +297,16 @@ class MainMenu(QMenuBar):
             action.setMenuRole(QAction.ApplicationSpecificRole)
         
         self.file_menu = self.addMenu('&File')
-        self.file_menu.addAction("Hello")
+        self.file_menu.addAction("Upload File(s)")
         self.edit_menu = self.addMenu('&Edit')
-        self.edit_menu.addAction("There")
-        self.view_menu = self.addMenu('&View')
-        self.view_menu.addAction("Obi-Wan")
+        profile_action = self.edit_menu.addAction("Profile Settings")
+        profile_action.triggered.connect(self.settings)
+        # self.view_menu = self.addMenu('&View')
+    
+    def settings(self):
+        if not self.config_window:
+            self.config_window = ConfigWindow('RED')
+        self.config_window.show()
 
 
 
