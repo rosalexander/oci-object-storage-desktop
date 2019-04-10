@@ -1,7 +1,7 @@
 from fbs_runtime.application_context import ApplicationContext, cached_property
 from PySide2.QtCore import Qt, SIGNAL, QObject, QTextCodec
 from PySide2.QtGui import QColor
-from PySide2.QtWidgets import QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QTreeWidget, QTreeWidgetItem, QDialogButtonBox, QDialog, QLineEdit, QAbstractItemView, QMenuBar, QMenu, QAction
+from PySide2.QtWidgets import QWidget, QMainWindow, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QTreeWidget, QTreeWidgetItem, QDialogButtonBox, QDialog, QLineEdit, QAbstractItemView, QMenuBar, QMenu, QAction
 from oci_manager import oci_manager
 from config import ConfigWindow
 import sys
@@ -12,24 +12,33 @@ class AppContext(ApplicationContext):
         stylesheet = self.get_resource('styles.qss')
         self.app.setStyleSheet(open(stylesheet).read())
         self.window.show()
-        self.menu.show()
+        # self.menu.show()
         return self.app.exec_()
     @cached_property
     def window(self):
         return MainWindow()
-    @cached_property
-    def menu(self):
-        return MainMenu()
-    
+    # @cached_property
+    # def menu(self):
+    #     return MainMenu()
 
-class MainWindow(QWidget):
-    
+
+
+class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         
-        self.setMinimumSize(800, 600)
-        self.setWindowTitle("OCI Object Storage: Not Connected")
+        self.central_widget = CentralWidget()
+        self.setCentralWidget(self.central_widget)
+        self.setWindowTitle(self.central_widget.windowTitle())
+        self.menubar = MainMenu()
+        self.setMenuBar(self.menubar)
 
+class CentralWidget(QWidget):
+    
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("OCI Object Storage: Not Connected")
+        self.setMinimumSize(800, 600)
         self.oci_manager = oci_manager()
 
         try:
