@@ -12,26 +12,44 @@ class AppContext(ApplicationContext):
         stylesheet = self.get_resource('styles.qss')
         self.app.setStyleSheet(open(stylesheet).read())
         self.window.show()
-        # self.menu.show()
         return self.app.exec_()
     @cached_property
     def window(self):
-        return MainWindow()
-    # @cached_property
-    # def menu(self):
-    #     return MainMenu()
-
-
+        return MainWindow(self.menu_bar, self.central, self.config)
+    @cached_property
+    def menu_bar(self):
+        return MainMenu()
+    @cached_property
+    def central(self):
+        return CentralWidget()
+    @cached_property
+    def config(self):
+        return ConfigWindow('DEFAULT')
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, main_menu, central_widget, config_window):
         super().__init__()
         
-        self.central_widget = CentralWidget()
+        self.central_widget = central_widget
+        self.menubar = main_menu
+        self.config_window = config_window
+        self.config_window.main_window = self
+        self.menubar.config_window = self.config_window
+
         self.setCentralWidget(self.central_widget)
         self.setWindowTitle(self.central_widget.windowTitle())
-        self.menubar = MainMenu()
         self.setMenuBar(self.menubar)
+
+
+    def change_profile(self, new_profile):
+        print(new_profile)
+        self.central_widget.refresh(new_profile)
+
+    def change_title(self):
+        self.setWindowTitle(self.central_widget.windowTitle())
+    
+
+
 
 class CentralWidget(QWidget):
     
@@ -39,11 +57,11 @@ class CentralWidget(QWidget):
         super().__init__()
         self.setWindowTitle("OCI Object Storage: Not Connected")
         self.setMinimumSize(800, 600)
-        self.oci_manager = oci_manager()
-
+        self.profile = 'DEFAULT'
+        self.oci_manager = oci_manager(profile = self.profile)
         try:
             self.treeWidget = self.get_compartment_tree()
-        except oci.exceptions.RequestException:
+        except:
             self.treeWidget = self.get_placeholder_tree('Compartments', 'Error: Failure to establish connection')
         else:
             self.setWindowTitle("OCI Object Storage: {}".format(self.oci_manager.get_namespace()))
@@ -74,16 +92,36 @@ class CentralWidget(QWidget):
         self.layout.addWidget(self.bucket_tree)
         self.layout.addWidget(self.obj_tree)
         self.setLayout(self.layout)
-    
-    def refresh(self):
-        self.oci_manager = oci_manager()
-        try:
-            self.treeWidget = self.get_compartment_tree()
-        except oci.exceptions.RequestException:
-            self.treeWidget = self.get_placeholder_tree('Compartments', 'Error: Failure to establish connection')
-        self.bucket_tree = self.get_placeholder_tree('Buckets', 'No compartment selected')
-        self.obj_tree = self.get_placeholder_tree('Objects', 'No bucket selected')
-    
+
+    def refresh(self, profile=None):
+        if profile:
+            self.profile = profile
+        self.oci_manager = oci_manager(profile=self.profile)
+
+        self.setWindowTitle("OCI Object Storage: {}".format(self.oci_manager.get_namespace()))
+        self.parentWidget().change_title()
+        
+        n1 = self.get_compartment_tree()
+        n2 = self.get_placeholder_tree('Buckets', 'No compartment selected')
+        n3 = self.get_placeholder_tree('Objects', 'No bucket selected')
+
+        self.layout.removeItem(self.layout.itemAt(3))
+        self.obj_tree.setParent(None)
+        self.obj_tree = n3
+        self.layout.insertWidget(3, self.obj_tree)
+
+        self.layout.removeItem(self.layout.itemAt(2))
+        self.bucket_tree.setParent(None)
+        self.bucket_tree = n2
+        self.layout.insertWidget(2, self.bucket_tree)
+
+        self.layout.removeItem(self.layout.itemAt(1))
+        self.treeWidget.setParent(None)
+        self.treeWidget = n1
+        self.layout.insertWidget(1, self.treeWidget)
+
+        
+
     def select_files(self):
         buckets = self.bucket_tree.selectedItems()
         if buckets:
@@ -102,8 +140,6 @@ class CentralWidget(QWidget):
             namespace = self.oci_manager.get_namespace()
             create_bucket_details = oci.object_storage.models.CreateBucketDetails(name=self.bucket_form.line.text(), compartment_id=compartment[-1].text(1))
             r = self.oci_manager.get_os().create_bucket(namespace, create_bucket_details)
-            print(create_bucket_details)
-            print(r.data)
             self.bucket_form.hide()
             self.select_compartment(compartment[-1])
 
@@ -189,19 +225,26 @@ class CentralWidget(QWidget):
         namespace = self.oci_manager.get_namespace()
         treeWidget = Tree()
         treeWidget.setHeaderLabel('Buckets')
-
-        data = self.oci_manager.get_os().list_buckets(namespace, ocid).data
-
-        if not data:
+        data = []
+        try:
+            data = self.oci_manager.get_os().list_buckets(namespace, ocid).data
+        except:
+            print("You do not have authorization to perform this request, or the requested resource could not be found")
             bucket_tree = QTreeWidgetItem(treeWidget)
-            bucket_tree.setText(0, 'Compartment contains no buckets')
+            bucket_tree.setText(0, 'You do not have authorization to perform this request, or the requested resource could not be found')
             bucket_tree.setTextColor(0, QColor(220,220,220))
-        else:
-            for bucket in data:
-                print(bucket.name)
+        finally:
+            if not data:
                 bucket_tree = QTreeWidgetItem(treeWidget)
-                bucket_tree.setText(0, bucket.name)
-            treeWidget.itemClicked.connect(self.select_bucket)
+                bucket_tree.setText(0, 'Compartment contains no buckets')
+                bucket_tree.setTextColor(0, QColor(220,220,220))
+            else:
+                for bucket in data:
+                    print(bucket.name)
+                    bucket_tree = QTreeWidgetItem(treeWidget)
+                    bucket_tree.setText(0, bucket.name)
+                treeWidget.itemClicked.connect(self.select_bucket)
+
         return treeWidget
     
     def get_objects_tree(self, bucket_name):
@@ -296,9 +339,10 @@ class Tree(QTreeWidget):
 
 
 class MainMenu(QMenuBar):
-    def __init__(self):
+    def __init__(self, config_window=None):
         super(MainMenu, self).__init__()
-        self.config_window = None
+        self.config_window = config_window
+        # self.config_window.setParent(self)
         self.setNativeMenuBar(True)
         test_menu = self.addMenu('&Test')
         for text in ["About", "Preferences"]:
@@ -314,8 +358,13 @@ class MainMenu(QMenuBar):
     
     def settings(self):
         if not self.config_window:
-            self.config_window = ConfigWindow('RED')
+            self.config_window = ConfigWindow('DEFAULT')
         self.config_window.show()
+    
+    def change_profile(self, new_profile):
+        self.parentWidget().change_profile(new_profile)
+        
+
 
 
 

@@ -13,6 +13,9 @@ class ConfigWindow(QWidget):
     def __init__(self, current_profile):
         super().__init__()
         print("Config Window Initialized")
+
+        self.main_window = None
+
         self.current_profile = current_profile
         self.DEFAULT_LOCATION = os.path.expanduser(os.path.join('~', '.oci', 'config'))
         self.config = configparser.ConfigParser(interpolation=None)
@@ -37,7 +40,10 @@ class ConfigWindow(QWidget):
         self.passphrase = QLineEdit()
         self.passphrase.setEchoMode(QLineEdit.Password)
         self.passphrase.setPlaceholderText("Passphrase")
-        
+
+        self.save_button = QPushButton('Save')
+        self.save_button.clicked.connect(self.save_signal)
+
         self.change_profile(current_profile)
         self.dropdown.setCurrentText(current_profile)
         
@@ -48,6 +54,7 @@ class ConfigWindow(QWidget):
         self.layout.addWidget(self.key_file)
         self.layout.addWidget(self.fingerprint)
         self.layout.addWidget(self.passphrase)
+        self.layout.addWidget(self.save_button)
 
         self.setLayout(self.layout)
     
@@ -75,6 +82,9 @@ class ConfigWindow(QWidget):
         self.fingerprint.setText(profile['fingerprint'])
         self.key_file.setText(profile['key_file'])
         self.passphrase.setText(profile['pass_phrase'])
+        
+        if self.main_window:
+            self.main_window.change_profile(self.current_profile)
     
     def create_new_profile(self):
         self.layout.removeItem(self.layout.itemAt(0))
@@ -98,6 +108,10 @@ class ConfigWindow(QWidget):
         self.buttonBox.setOrientation(Qt.Horizontal)
         self.buttonBox.addButton(self.create_button, QDialogButtonBox.ActionRole)
         self.buttonBox.addButton(self.cancel_button, QDialogButtonBox.ActionRole)
+
+        self.layout.removeItem(self.layout.itemAt(7))
+        self.save_button.setParent(None)
+
         self.layout.addWidget(self.buttonBox)
         
     
@@ -114,13 +128,19 @@ class ConfigWindow(QWidget):
         with open(self.DEFAULT_LOCATION, 'w') as configfile:
             self.config.write(configfile)
 
-        # dropdown = self.layout.itemAt(5)
-        # self.layout.removeItem(self.layout.itemAt(5))
-        # dropdown.setParent(None)
-        # self.layout.insertItem(0, self.dropdown)
-
         self.current_profile = profile_name
         self.cancel_signal()
+    
+    def save_signal(self):
+        self.config[self.current_profile]['tenancy'] = self.tenancy.text()
+        self.config[self.current_profile]['region'] = self.region.text()
+        self.config[self.current_profile]['user'] = self.user.text()
+        self.config[self.current_profile]['fingerprint'] = self.fingerprint.text()
+        self.config[self.current_profile]['key_file'] = self.key_file.text()
+        self.config[self.current_profile]['pass_phrase'] = self.passphrase.text()
+        
+        with open(self.DEFAULT_LOCATION, 'w') as configfile:
+            self.config.write(configfile)
     
     def cancel_signal(self):
         self.layout.removeItem(self.layout.itemAt(0))
@@ -131,10 +151,12 @@ class ConfigWindow(QWidget):
 
         self.layout.removeItem(self.layout.itemAt(7))
         self.buttonBox.setParent(None)
-        print(self.current_profile)
 
         self.change_profile(self.current_profile)
         self.dropdown.setCurrentText(self.current_profile)
+        
+        print(self.buttonBox)
+        self.layout.addWidget(self.save_button)
 
 
 if __name__ == '__main__':
