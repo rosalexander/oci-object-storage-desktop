@@ -81,7 +81,10 @@ class ConfigWindow(QWidget):
         self.user.setText(profile['user'])
         self.fingerprint.setText(profile['fingerprint'])
         self.key_file.setText(profile['key_file'])
-        self.passphrase.setText(profile['pass_phrase'])
+        if 'pass_phrase' in profile:
+            self.passphrase.setText(profile['pass_phrase'])
+        else:
+            self.passphrase.setText("")
         
         if self.main_window:
             self.main_window.change_profile(self.current_profile)
