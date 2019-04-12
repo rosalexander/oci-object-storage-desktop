@@ -52,5 +52,8 @@ class oci_manager():
             self.namespace = "Not connected"
         self.compartments = []
         self.objects = []
+    
+    def create_bucket_details(self, name, compartment_id):
+        return oci.object_storage.models.CreateBucketDetails(name=name, compartment_id=compartment_id)
 
     

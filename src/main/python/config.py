@@ -16,11 +16,14 @@ class ConfigWindow(QWidget):
 
         self.main_window = None
 
-        self.current_profile = current_profile
+        
+
+
         self.DEFAULT_LOCATION = os.path.expanduser(os.path.join('~', '.oci', 'config'))
         self.config = configparser.ConfigParser(interpolation=None)
         self.config.read(self.DEFAULT_LOCATION)
-        
+
+        self.current_profile = current_profile        
         self.setWindowTitle("Profile Settings")
         self.setMinimumSize(600, 200)
 
@@ -43,6 +46,7 @@ class ConfigWindow(QWidget):
 
         self.save_button = QPushButton('Save')
         self.save_button.clicked.connect(self.save_signal)
+
 
         self.change_profile(current_profile)
         self.dropdown.setCurrentText(current_profile)
@@ -76,15 +80,22 @@ class ConfigWindow(QWidget):
     def change_profile(self, profile_name):
         self.current_profile = profile_name
         profile = self.config[profile_name]
-        self.tenancy.setText(profile['tenancy'])
-        self.region.setText(profile['region'])
-        self.user.setText(profile['user'])
-        self.fingerprint.setText(profile['fingerprint'])
-        self.key_file.setText(profile['key_file'])
-        if 'pass_phrase' in profile:
-            self.passphrase.setText(profile['pass_phrase'])
-        else:
-            self.passphrase.setText("")
+        # self.tenancy.setText(profile['tenancy'])
+        # self.region.setText(profile['region'])
+        # self.user.setText(profile['user'])
+        # self.fingerprint.setText(profile['fingerprint'])
+        # self.key_file.setText(profile['key_file'])
+        # if 'pass_phrase' in profile:
+        #     self.passphrase.setText(profile['pass_phrase'])
+        # else:
+        #     self.passphrase.setText("")
+
+        
+        for line, key in zip([self.tenancy, self.region, self.user, self.fingerprint, self.key_file, self.passphrase], ['tenancy', 'region', 'user', 'fingerprint', 'key_file', 'pass_phrase']):
+            if key in profile:
+                line.setText(profile[key])
+            else:
+                line.setText("")
         
         if self.main_window:
             self.main_window.change_profile(self.current_profile)

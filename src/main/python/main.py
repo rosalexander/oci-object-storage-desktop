@@ -62,6 +62,7 @@ class CentralWidget(QWidget):
         try:
             self.treeWidget = self.get_compartment_tree()
         except:
+            print('Error: Failure to establish connection')
             self.treeWidget = self.get_placeholder_tree('Compartments', 'Error: Failure to establish connection')
         else:
             self.setWindowTitle("OCI Object Storage: {}".format(self.oci_manager.get_namespace()))
@@ -93,15 +94,22 @@ class CentralWidget(QWidget):
         self.layout.addWidget(self.obj_tree)
         self.setLayout(self.layout)
 
-    def refresh(self, profile=None):
+    def refresh(self, profile=None, prev_compartment=None, prev_bucket=None):
         if profile:
             self.profile = profile
         self.oci_manager = oci_manager(profile=self.profile)
 
         self.setWindowTitle("OCI Object Storage: {}".format(self.oci_manager.get_namespace()))
         self.parentWidget().change_title()
-        
-        n1 = self.get_compartment_tree()
+
+        try:
+            n1 = self.get_compartment_tree()
+        except:
+            print('Error: Failure to establish connection')
+            n1 = self.get_placeholder_tree('Compartments', 'Error: Failure to establish connection')
+
+
+            
         n2 = self.get_placeholder_tree('Buckets', 'No compartment selected')
         n3 = self.get_placeholder_tree('Objects', 'No bucket selected')
 
@@ -119,6 +127,13 @@ class CentralWidget(QWidget):
         self.treeWidget.setParent(None)
         self.treeWidget = n1
         self.layout.insertWidget(1, self.treeWidget)
+
+        if prev_compartment:
+            self.select_compartment(self.treeWidget.itemAt(prev_compartment))
+        if prev_bucket:
+            self.select_bucket(self.bucket_tree.itemAt(prev_bucket))
+
+
 
         
 
@@ -138,7 +153,7 @@ class CentralWidget(QWidget):
         def create_bucket():
             print(self.bucket_form.line.text())
             namespace = self.oci_manager.get_namespace()
-            create_bucket_details = oci.object_storage.models.CreateBucketDetails(name=self.bucket_form.line.text(), compartment_id=compartment[-1].text(1))
+            create_bucket_details = self.oci_manager.create_bucket_details(name=self.bucket_form.line.text(), compartment_id=compartment[-1].text(1))
             r = self.oci_manager.get_os().create_bucket(namespace, create_bucket_details)
             self.bucket_form.hide()
             self.select_compartment(compartment[-1])
@@ -305,6 +320,7 @@ class Tree(QTreeWidget):
 
     
     def dragEnterEvent(self, e):
+        
         if e.mimeData().hasUrls():
             e.acceptProposedAction()
         else:
@@ -335,6 +351,9 @@ class Tree(QTreeWidget):
                         with open(subfile, 'rb') as file_object:
                             self.oci_manager.get_os().put_object(self.oci_manager.get_namespace(), self.bucket_name, subfile[dir_length:], file_object.read())
                     root_dir = False
+
+        bucket = parent.bucket_tree.currentItem()
+        self.parentWidget().select_bucket(bucket)
 
 
 
