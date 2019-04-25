@@ -11,24 +11,29 @@ from PySide2.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxL
 
 class ConfigWindow(QWidget):
     def __init__(self, current_profile):
+        """
+        The ConfigWindow is a widget dedicated to reading and editing the OCI config file and provides functionality to create, edit, and switch profiles on the fly, updating
+        the view of the main window.
+
+        :param current_profile: The profile the ConfigWindow should be initialized with
+        :type current_profile: string
+        """
         super().__init__()
-        print("Config Window Initialized")
 
+        #
         self.main_window = None
-
-        
-
-
-        self.DEFAULT_LOCATION = os.path.expanduser(os.path.join('~', '.oci', 'config'))
-        self.config = configparser.ConfigParser(interpolation=None)
-        self.config.read(self.DEFAULT_LOCATION)
-
-        self.current_profile = current_profile        
         self.setWindowTitle("Profile Settings")
         self.setMinimumSize(600, 200)
 
-        self.layout = QVBoxLayout()
+        #Looks for the config file in '~/.oci/config' and reads it into config
+        self.DEFAULT_LOCATION = os.path.expanduser(os.path.join('~', '.oci', 'config'))
+        self.config = configparser.ConfigParser(interpolation=None)
+        self.config.read(self.DEFAULT_LOCATION)
+        self.current_profile = current_profile
 
+        
+        
+        #Set up necessary dropdown and LineEdit widgets
         self.dropdown = self.get_profiles_dropdown()
         self.tenancy = QLineEdit()
         self.tenancy.setPlaceholderText("Tenancy OCID")
@@ -43,14 +48,15 @@ class ConfigWindow(QWidget):
         self.passphrase = QLineEdit()
         self.passphrase.setEchoMode(QLineEdit.Password)
         self.passphrase.setPlaceholderText("Passphrase")
-
         self.save_button = QPushButton('Save')
         self.save_button.clicked.connect(self.save_signal)
 
-
+        #Set the profile to the current_profile passed in upon init
         self.change_profile(current_profile)
         self.dropdown.setCurrentText(current_profile)
         
+        #Add all widgets to a vertical layout
+        self.layout = QVBoxLayout()
         self.layout.addWidget(self.dropdown)
         self.layout.addWidget(self.tenancy)
         self.layout.addWidget(self.region)
@@ -63,6 +69,12 @@ class ConfigWindow(QWidget):
         self.setLayout(self.layout)
     
     def get_profiles_dropdown(self):
+        """
+        :return:
+            A dropdown menu widget that lists all profiles including the default profile from the OCI config file
+            When index changes, it will call the change_profile signal function
+        :rtype: :class: 'Qt.QtWidgets.QComboBox'
+        """
         dropdown = QComboBox()
         dropdown.addItems(['DEFAULT'] + self.config.sections())
         dropdown.addItem("Add New Profile...")
@@ -70,6 +82,13 @@ class ConfigWindow(QWidget):
         return dropdown
 
     def change_profile_signal(self, item):
+        """
+        Slot to change profile. If the item index is at 0, then it is the default profile.
+        If it is the last index, then that means create a new profile
+
+        :param item: The index of the item from the dropdown widget
+        :type item: int
+        """
         if item > len(self.config.sections()):
             self.create_new_profile()
         elif item == 0:
@@ -78,20 +97,19 @@ class ConfigWindow(QWidget):
             self.change_profile(self.config.sections()[item - 1])
     
     def change_profile(self, profile_name):
+        """
+        Changes the profile that the ConfigWindow is set for and also changes it for the MainWindow
+
+        :param profile_name: the name of the profile to switch to
+        :type profile_name: string
+
+        TODO: Adhere to signal/slot convention
+        """
         self.current_profile = profile_name
         profile = self.config[profile_name]
-        # self.tenancy.setText(profile['tenancy'])
-        # self.region.setText(profile['region'])
-        # self.user.setText(profile['user'])
-        # self.fingerprint.setText(profile['fingerprint'])
-        # self.key_file.setText(profile['key_file'])
-        # if 'pass_phrase' in profile:
-        #     self.passphrase.setText(profile['pass_phrase'])
-        # else:
-        #     self.passphrase.setText("")
-
-        
-        for line, key in zip([self.tenancy, self.region, self.user, self.fingerprint, self.key_file, self.passphrase], ['tenancy', 'region', 'user', 'fingerprint', 'key_file', 'pass_phrase']):
+ 
+        for line, key in zip([self.tenancy, self.region, self.user, self.fingerprint, self.key_file, self.passphrase],\
+        ['tenancy', 'region', 'user', 'fingerprint', 'key_file', 'pass_phrase']):
             if key in profile:
                 line.setText(profile[key])
             else:
@@ -101,6 +119,9 @@ class ConfigWindow(QWidget):
             self.main_window.change_profile(self.current_profile)
     
     def create_new_profile(self):
+        """
+        Layout to create a new profile. Removes the dropdown widget and changes the buttons
+        """
         self.layout.removeItem(self.layout.itemAt(0))
         self.dropdown.setParent(None)
 
@@ -130,6 +151,9 @@ class ConfigWindow(QWidget):
         
     
     def create_signal(self):
+        """
+        Create a new profile with the given information in the LineEdit widgets. Saves to the OCI config file
+        """
         profile_name = self.new_profile_name.text()
         self.config[profile_name] = {}
         self.config[profile_name]['tenancy'] = self.tenancy.text()
@@ -146,6 +170,9 @@ class ConfigWindow(QWidget):
         self.cancel_signal()
     
     def save_signal(self):
+        """
+        Saves edits on a currently existing profile. Saves to the OCI config file
+        """
         self.config[self.current_profile]['tenancy'] = self.tenancy.text()
         self.config[self.current_profile]['region'] = self.region.text()
         self.config[self.current_profile]['user'] = self.user.text()
@@ -157,6 +184,9 @@ class ConfigWindow(QWidget):
             self.config.write(configfile)
     
     def cancel_signal(self):
+        """
+        Cancels the creation a new profile and reverts layout to default layout
+        """
         self.layout.removeItem(self.layout.itemAt(0))
         self.new_profile_name.setParent(None)
 
@@ -169,7 +199,6 @@ class ConfigWindow(QWidget):
         self.change_profile(self.current_profile)
         self.dropdown.setCurrentText(self.current_profile)
         
-        print(self.buttonBox)
         self.layout.addWidget(self.save_button)
 
 

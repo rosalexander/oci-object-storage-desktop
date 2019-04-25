@@ -4,25 +4,54 @@ import sys
 
 class oci_manager():
     def __init__(self, profile='DEFAULT'):
+        """
+        :param profile: The config profile the OCI manager will use
+        :type profile: string
+        """
         self.DEFAULT_LOCATION = os.path.expanduser(os.path.join('~', '.oci', 'config'))
         self.change_profile(profile)
     
     def get_config(self):
+        """
+        :return: The config file of the OCI manager
+        :rtype: dict
+        """
         return self.config
     
     def get_id(self):
+        """
+        :return: The identity client of OCI manager for identity-related jobs
+        :rtype: :class: 'oci.identity.IdentityClient'
+        """
         return self.id_client
     
     def get_os(self):
+        """
+        :return: The object storage client of OCI manager for object storage related jobs
+        :rtype: :class: 'oci.object_storage.ObjectStorageClient'
+        """
+
         return self.os_client
     
     def get_namespace(self):
+        """
+        :return: The name of the tenancy
+        :rtype: string
+        """
         return self.namespace
     
     def get_tenancy(self):
+        """
+        :return: The OCID of the tenancy
+        :rtype: string
+        """
         return self.tenancy
     
     def change_profile(self, new_profile):
+        """
+        :param new_profile: The profile the OCI manager will begin to use to instantiate OCI classes such as an identity client, object storage client, etc
+        :rtype new_profile: string
+        """
         try:
             self.config = oci.config.from_file(profile_name=new_profile)
         except:
@@ -54,6 +83,17 @@ class oci_manager():
         self.objects = []
     
     def create_bucket_details(self, name, compartment_id):
+        """
+        :return: Bucket details for creating a new bucket
+        :rtype: :class: 'oci.object_storage.models.CreateBucketDetails'
+        """
         return oci.object_storage.models.CreateBucketDetails(name=name, compartment_id=compartment_id)
+    
+    def get_upload_manager(self):
+        """
+        :return: Upload manager for calling upload jobs with object storage
+        :rtype: :class: 'oci.object_storage.UploadManager'
+        """
+        return oci.object_storage.UploadManager(self.get_os())
 
     
