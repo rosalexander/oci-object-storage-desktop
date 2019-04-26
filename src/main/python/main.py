@@ -4,6 +4,7 @@ from PySide2.QtGui import QColor
 from PySide2.QtWidgets import QWidget, QMainWindow, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QTreeWidget, QTreeWidgetItem, QDialogButtonBox, QDialog, QLineEdit, QAbstractItemView, QMenuBar, QMenu, QAction, QProgressBar
 from oci_manager import oci_manager
 from config import ConfigWindow
+from progress import ProgressWindow
 import sys
 import os
 
@@ -211,31 +212,35 @@ class CentralWidget(QWidget):
         #         self.oci_manager.get_os().put_object(namespace, bucket_name, file.split('/')[-1], file_object.read())
         currently_uploading = []
         byte_type = ['KB', 'MB', 'GB', 'PB']
-        # for file in files[0]:
-        #     print('Uploading ' + file)
-        #     filesize = os.stat(file).st_size
-        #     obj_tree_item = QTreeWidgetItem(self.obj_tree)
-        #     obj_tree_item.setText(0, file.split('/')[-1])
-        #     byte_type_pointer = 0
-        #     byte_size = filesize/1024.0
-        #     while byte_size > 1024:
-        #         byte_size = byte_size/1024.0
-        #         byte_type_pointer += 1
-        #     byte_size = round(byte_size, 2)
-        #     obj_tree_item.setText(1, "0/{} {}".format(str(byte_size), byte_type[byte_type_pointer]))
-        #     currently_uploading.append(obj_tree_item)
 
+        filesizes = []
+        for file in files[0]:
+            filesize = os.stat(file).st_size
+            
+            byte_type_pointer = 0
+            byte_size = filesize/1024.0
+            while byte_size > 1024:
+                byte_size = byte_size/1024.0
+                byte_type_pointer += 1
+            byte_size = round(byte_size, 2)
 
-        self.progress_window = ProgressWindow(files)
+            filesize_readable = '{} {}'.format(str(byte_size), byte_type[byte_type_pointer])
+            filesizes.append((filesize, filesize_readable))
+
+        print(filesizes)
+
+        self.progress_window = ProgressWindow(files, filesizes)
         self.progress_window.show()
         self.upload_thread = UploadThread(files, bucket_name, self.oci_manager)
-        self.upload_thread.file_uploaded.connect(self.file_uploaded)
+        self.upload_thread.file_uploaded.connect(self.progress_window.next_file)
+        self.upload_thread.bytes_uploaded.connect(self.progress_window.set_progress)
         self.upload_thread.start()
     
     def file_uploaded(self, filename, filesize):
         """
         TODO: Return some information when a file upload job completes
         """
+        print(filename, filesize, "Uploaded")
         return None
 
     def get_compartment_tree(self):
@@ -481,7 +486,7 @@ class Tree(QTreeWidget):
                             self.oci_manager.get_os().put_object(self.oci_manager.get_namespace(), self.bucket_name, subfile[dir_length:], file_object.read())
                     root_dir = False
 
-        bucket = parent.bucket_tree.currentItem()
+        bucket = self.parentWidget().bucket_tree.currentItem()
         self.parentWidget().select_bucket(bucket)
 
 
@@ -526,8 +531,9 @@ class MainMenu(QMenuBar):
 
 class UploadThread(QThread):
 
-    file_uploaded = Signal(str, int)
+    file_uploaded = Signal()
     bytes_uploaded = Signal(int)
+    all_files_uploaded = Signal()
 
     def __init__(self, files, bucket_name, oci_manager):
         """
@@ -575,17 +581,9 @@ class UploadThread(QThread):
 
         for file in self.files[0]:
             filesize = os.stat(file).st_size
-            self.file_uploaded.emit(file.split('/')[-1], filesize)
             self.upload_file(file)
-
-class ProgressWindow(QWidget):
-    def __init__(self, files):
-        super().__init__()
-        self.layout = QVBoxLayout()
-        self.progress = QProgressBar()
-        self.progress.setMaximum(5)
-        self.progress.setValue(2)
-        self.layout.addWidget(self.progress)
+            self.file_uploaded.emit()
+        self.all_files_uploaded.emit()
 
 if __name__ == '__main__':
     appctxt = AppContext()
