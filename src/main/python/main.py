@@ -1,10 +1,11 @@
 from fbs_runtime.application_context import ApplicationContext, cached_property
 from PySide2.QtCore import Qt, Signal, QObject, QTextCodec, QThread
-from PySide2.QtGui import QColor
+from PySide2.QtGui import QColor, QCursor
 from PySide2.QtWidgets import QWidget, QMainWindow, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QTreeWidget, QTreeWidgetItem, QDialogButtonBox, QDialog, QLineEdit, QAbstractItemView, QMenuBar, QMenu, QAction, QProgressBar
-from oci_manager import oci_manager
+from oci_manager import oci_manager, UploadId
 from config import ConfigWindow
 from progress import ProgressWindow
+from util import get_filesize
 import sys
 import os
 
@@ -204,14 +205,14 @@ class CentralWidget(QWidget):
         :param bucket_name: The name of bucket to upload file(s) to in OCI
         :type bucket_name: string
 
-        TODO: Implement cancelling upload jobs, pausing upload jobs, and resuming upload jobs
+        TODO: Implement cancelling upload jobs, pausing upload jobs, and resuming upload jobs. Progress window is bigger than it should be, but functional
         """
         # namespace = self.oci_manager.get_namespace()
         # for file in files[0]:
         #     with open(file, 'rb') as file_object:
         #         self.oci_manager.get_os().put_object(namespace, bucket_name, file.split('/')[-1], file_object.read())
         currently_uploading = []
-        byte_type = ['KB', 'MB', 'GB', 'PB']
+        byte_type = ['KB', 'MB', 'GB', 'TB', 'PB']
 
         filesizes = []
         for file in files[0]:
@@ -224,16 +225,19 @@ class CentralWidget(QWidget):
                 byte_type_pointer += 1
             byte_size = round(byte_size, 2)
 
-            filesize_readable = '{} {}'.format(str(byte_size), byte_type[byte_type_pointer])
+            filesize_readable = [str(byte_size), byte_type[byte_type_pointer]]
             filesizes.append((filesize, filesize_readable))
 
         print(filesizes)
 
         self.progress_window = ProgressWindow(files, filesizes)
-        self.progress_window.show()
+        # print(self.progress_window.minimumSizeHint())
+        # self.progress_window.resize(100, 100)
         self.upload_thread = UploadThread(files, bucket_name, self.oci_manager)
         self.upload_thread.file_uploaded.connect(self.progress_window.next_file)
         self.upload_thread.bytes_uploaded.connect(self.progress_window.set_progress)
+        self.progress_window.cancel.clicked.connect(self.upload_thread.connection_canceled)
+        self.progress_window.show()
         self.upload_thread.start()
     
     def file_uploaded(self, filename, filesize):
@@ -373,7 +377,7 @@ class CentralWidget(QWidget):
         tree_widget.setColumnCount(2)
         tree_widget.setHeaderLabels(['Objects', 'Size'])
 
-        byte_type = ['KB', 'MB', 'GB', 'PB']
+        byte_type = ['KB', 'MB', 'GB', 'TB', 'PB']
 
         data = self.oci_manager.get_os().list_objects(namespace, bucket_name, fields='size').data.objects
 
@@ -443,8 +447,13 @@ class Tree(QTreeWidget):
         super(Tree, self).__init__()
         # self.setDefaultDropAction(Qt.MoveAction)
         # self.setDragDropMode(QAbstractItemView.DragDrop)
+        
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        
         if accept_drop:
+            self.customContextMenuRequested.connect(self.object_context_menu)
             self.setAcceptDrops(accept_drop)
+            self.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.bucket_name = bucket_name
         self.oci_manager = oci_manager
 
@@ -460,36 +469,55 @@ class Tree(QTreeWidget):
             e.acceptProposedAction()
         else:
             e.ignore()
+    
+    def object_context_menu(self):
+        menu = QMenu(self)
+        delete_action = menu.addAction("Delete")
+        delete_action.triggered.connect(self.delete_objects)
+        menu.exec_(QCursor.pos())
+    
+    def delete_objects(self):
+        items = self.selectedItems()
+        for item in items:
+            self.oci_manager.delete_object(self.bucket_name, item.text(0))
+
+
 
     def dropEvent(self, e):
         """
         If the event has urls (such as dropped files), and the class is given an OCI manager and and bucket name, upload the files to the bucket
 
-        TODO: Folder uploads. Use signals/slots
+        TODO: Use signals/slots
         """
+        print(e.mimeData().urls())
+        files = []
+        filesizes = []
+
         for url in e.mimeData().urls():
             file = url.toLocalFile()
-            print("Dropped file: " + file)
+
             if os.path.isfile(file):
-                if self.oci_manager and self.bucket_name:
-                    with open(file, 'rb') as file_object:
-                        self.oci_manager.get_os().put_object(self.oci_manager.get_namespace(), self.bucket_name, file.split('/')[-1], file_object.read())
+                files.append(file)
+                filesizes.append(get_filesize(file))
+                
             elif os.path.isdir(file):
-                split_dir = file.split('/')
-                dir_length = len(file) - len(split_dir[-2]) - 1
                 root_dir = True
                 for dir, _, filenames in os.walk(file):
                     for filename in filenames:
                         subfile = "{}/{}".format(dir, filename) if not root_dir else "{}{}".format(dir, filename)
-                        print(subfile[dir_length:])
-                        with open(subfile, 'rb') as file_object:
-                            self.oci_manager.get_os().put_object(self.oci_manager.get_namespace(), self.bucket_name, subfile[dir_length:], file_object.read())
+                        files.append(subfile)
+                        filesizes.append(get_filesize(subfile))
                     root_dir = False
 
-        bucket = self.parentWidget().bucket_tree.currentItem()
-        self.parentWidget().select_bucket(bucket)
+        print(filesizes)
 
-
+        self.progress_window = ProgressWindow((files, "All files"), filesizes)
+        self.upload_thread = UploadThread((files, "All files"), self.bucket_name, self.oci_manager)
+        self.upload_thread.file_uploaded.connect(self.progress_window.next_file)
+        self.upload_thread.bytes_uploaded.connect(self.progress_window.set_progress)
+        self.progress_window.cancel.clicked.connect(self.upload_thread.connection_canceled)
+        self.progress_window.show()
+        self.upload_thread.start()
 
 class MainMenu(QMenuBar):
     def __init__(self, config_window=None):
@@ -534,10 +562,11 @@ class UploadThread(QThread):
     file_uploaded = Signal()
     bytes_uploaded = Signal(int)
     all_files_uploaded = Signal()
+    upload_failed = Signal()
 
     def __init__(self, files, bucket_name, oci_manager):
         """
-        UploadThread allows upload jobs to run in a different thread than the application, so the application doesn't stall or freeze
+        UploadThread allows upload jobs to run in a differen;t thread than the application, so the application doesn't stall or freeze
         
         :param files: A tuple of files. First element is a list of absolute paths to the files. Second element is the mimetype of files
         :type files: tuple
@@ -552,6 +581,21 @@ class UploadThread(QThread):
         self.os_client = oci_manager.get_os()
         self.namespace = oci_manager.get_namespace()
         self.upload_manager = oci_manager.get_upload_manager()
+        self.upload_id = UploadId()
+        self.upload_id.test.connect(self.test)
+
+
+    def test(self, id):
+        print("Hello world!")
+        print(id)
+    
+    def connection_failed(self):
+        print("Connection failed")
+        self.upload_failed = Signal()
+    
+    def connection_canceled(self):
+        print("Connection cancelled")
+        self.quit()
     
     def progress_callback(self, bits):
         """
@@ -565,24 +609,37 @@ class UploadThread(QThread):
     def __del__(self):
         self.wait()
     
-    def upload_file(self, file):
+    def upload_file(self, file, object_name):
         """
         Upload the file and pass in a callback function
 
         :param file: The absolute path of the file
         :type file: string
         """
-        self.upload_manager.upload_file(self.namespace, self.bucket_name, file.split('/')[-1], file, progress_callback=self.progress_callback)
+        response = self.upload_manager.upload_file(self.namespace, self.bucket_name, object_name, file, progress_callback=self.progress_callback, mixin=self.upload_id)
+        print(response)
+        return response
     
     def run(self):
         """
 
         """
-
+        print(self.files[0])
         for file in self.files[0]:
-            filesize = os.stat(file).st_size
-            self.upload_file(file)
-            self.file_uploaded.emit()
+            if os.path.isfile(file):
+                filesize = os.stat(file).st_size
+                self.upload_file(file, file.split('/')[-1])
+                self.file_uploaded.emit()
+            elif os.path.isdir(file):
+                split_dir = file.split('/')
+                dir_length = len(file) - len(split_dir[-2]) - 1
+                root_dir = True
+                for dir, _, filenames in os.walk(file):
+                    for filename in filenames:
+                        subfile = "{}/{}".format(dir, filename) if not root_dir else "{}{}".format(dir, filename)
+                        print(subfile[dir_length:])
+                        self.upload_file(subfile, subfile[dir_length:])
+                    root_dir = False
         self.all_files_uploaded.emit()
 
 if __name__ == '__main__':
