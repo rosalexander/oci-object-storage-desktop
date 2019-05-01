@@ -74,6 +74,7 @@ class CentralWidget(QWidget):
         self.setMinimumSize(800, 600)
         self.profile = 'DEFAULT'
         self.oci_manager = oci_manager(profile = self.profile)
+
         try:
             self.compartment_tree = self.get_compartment_tree()
         except:
@@ -207,36 +208,18 @@ class CentralWidget(QWidget):
 
         TODO: Implement cancelling upload jobs, pausing upload jobs, and resuming upload jobs. Progress window is bigger than it should be, but functional
         """
-        # namespace = self.oci_manager.get_namespace()
-        # for file in files[0]:
-        #     with open(file, 'rb') as file_object:
-        #         self.oci_manager.get_os().put_object(namespace, bucket_name, file.split('/')[-1], file_object.read())
-        currently_uploading = []
-        byte_type = ['KB', 'MB', 'GB', 'TB', 'PB']
-
+        
         filesizes = []
+
         for file in files[0]:
-            filesize = os.stat(file).st_size
-            
-            byte_type_pointer = 0
-            byte_size = filesize/1024.0
-            while byte_size > 1024:
-                byte_size = byte_size/1024.0
-                byte_type_pointer += 1
-            byte_size = round(byte_size, 2)
-
-            filesize_readable = [str(byte_size), byte_type[byte_type_pointer]]
-            filesizes.append((filesize, filesize_readable))
-
-        print(filesizes)
+            filesizes.append(get_filesize(file))
 
         self.progress_window = ProgressWindow(files, filesizes)
-        # print(self.progress_window.minimumSizeHint())
-        # self.progress_window.resize(100, 100)
-        self.upload_thread = UploadThread(files, bucket_name, self.oci_manager)
+        self.upload_thread = UploadThread(files, bucket_name, self.oci_manager, filesizes)
         self.upload_thread.file_uploaded.connect(self.progress_window.next_file)
+        self.upload_thread.file_uploaded.connect(self.file_uploaded)
         self.upload_thread.bytes_uploaded.connect(self.progress_window.set_progress)
-        self.progress_window.cancel.clicked.connect(self.upload_thread.connection_canceled)
+        self.progress_window.cancel.clicked.connect(self.file_upload_canceled)
         self.progress_window.show()
         self.upload_thread.start()
     
@@ -245,7 +228,15 @@ class CentralWidget(QWidget):
         TODO: Return some information when a file upload job completes
         """
         print(filename, filesize, "Uploaded")
-        return None
+        obj_tree_item = QTreeWidgetItem(self.obj_tree)
+        obj_tree_item.setText(0, filename)
+        obj_tree_item.setText(1, filesize)
+    
+    def file_upload_canceled(self):
+        # print("Connection cancelled")
+        # self.upload_thread.quit()
+        # self.upload_thread.wait()
+        self.upload_thread.stop()
 
     def get_compartment_tree(self):
         """
@@ -472,7 +463,10 @@ class Tree(QTreeWidget):
     
     def object_context_menu(self):
         menu = QMenu(self)
-        delete_action = menu.addAction("Delete")
+        upload_action = menu.addAction("Upload file(s)")
+        delete_action = menu.addAction("Delete file(s)")
+        if not self.selectedItems():
+            delete_action.setEnabled(False)
         delete_action.triggered.connect(self.delete_objects)
         menu.exec_(QCursor.pos())
     
@@ -480,8 +474,7 @@ class Tree(QTreeWidget):
         items = self.selectedItems()
         for item in items:
             self.oci_manager.delete_object(self.bucket_name, item.text(0))
-
-
+            self.takeTopLevelItem(self.indexOfTopLevelItem(item))
 
     def dropEvent(self, e):
         """
@@ -509,15 +502,25 @@ class Tree(QTreeWidget):
                         filesizes.append(get_filesize(subfile))
                     root_dir = False
 
-        print(filesizes)
-
         self.progress_window = ProgressWindow((files, "All files"), filesizes)
-        self.upload_thread = UploadThread((files, "All files"), self.bucket_name, self.oci_manager)
+        self.upload_thread = UploadThread((files, "All files"), self.bucket_name, self.oci_manager, filesizes)
         self.upload_thread.file_uploaded.connect(self.progress_window.next_file)
+        self.upload_thread.file_uploaded.connect(self.file_uploaded)
         self.upload_thread.bytes_uploaded.connect(self.progress_window.set_progress)
-        self.progress_window.cancel.clicked.connect(self.upload_thread.connection_canceled)
+        self.progress_window.cancel.clicked.connect(self.upload_thread.stop)
         self.progress_window.show()
         self.upload_thread.start()
+    
+    def file_uploaded(self, filename, filesize):
+        """
+        TODO: Return some information when a file upload job completes
+        """
+        print(filename, filesize, "Uploaded")
+        obj_tree_item = QTreeWidgetItem(self)
+        obj_tree_item.setText(0, filename)
+        obj_tree_item.setText(1, filesize)
+
+        return None
 
 class MainMenu(QMenuBar):
     def __init__(self, config_window=None):
@@ -559,12 +562,12 @@ class MainMenu(QMenuBar):
 
 class UploadThread(QThread):
 
-    file_uploaded = Signal()
+    file_uploaded = Signal(str, str)
     bytes_uploaded = Signal(int)
     all_files_uploaded = Signal()
     upload_failed = Signal()
 
-    def __init__(self, files, bucket_name, oci_manager):
+    def __init__(self, files, bucket_name, oci_manager, filesizes):
         """
         UploadThread allows upload jobs to run in a differen;t thread than the application, so the application doesn't stall or freeze
         
@@ -583,7 +586,9 @@ class UploadThread(QThread):
         self.upload_manager = oci_manager.get_upload_manager()
         self.upload_id = UploadId()
         self.upload_id.test.connect(self.test)
-
+        self.filesizes = filesizes
+        self.threadactive = True
+        self.setTerminationEnabled()
 
     def test(self, id):
         print("Hello world!")
@@ -608,6 +613,10 @@ class UploadThread(QThread):
         
     def __del__(self):
         self.wait()
+
+    def stop(self):
+        print("Connection stopped")
+        self.wait()
     
     def upload_file(self, file, object_name):
         """
@@ -624,12 +633,10 @@ class UploadThread(QThread):
         """
 
         """
-        print(self.files[0])
-        for file in self.files[0]:
+        for i, file in enumerate(self.files[0]):
             if os.path.isfile(file):
-                filesize = os.stat(file).st_size
                 self.upload_file(file, file.split('/')[-1])
-                self.file_uploaded.emit()
+                self.file_uploaded.emit(file.split('/')[-1], " ".join(self.filesizes[i][1]))
             elif os.path.isdir(file):
                 split_dir = file.split('/')
                 dir_length = len(file) - len(split_dir[-2]) - 1
@@ -639,6 +646,7 @@ class UploadThread(QThread):
                         subfile = "{}/{}".format(dir, filename) if not root_dir else "{}{}".format(dir, filename)
                         print(subfile[dir_length:])
                         self.upload_file(subfile, subfile[dir_length:])
+                        self.file_uploaded.emit(file.split('/')[-1], " ".join(self.filesizes[i][1]))
                     root_dir = False
         self.all_files_uploaded.emit()
 

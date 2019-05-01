@@ -211,15 +211,17 @@ class UploadManager(oci.object_storage.UploadManager):
                     upload_kwargs['progress_callback'] = kwargs['progress_callback']
 
                 ma.new_upload()
+
                 if mixin:
                     mixin.signal_upload_id(ma.manifest['uploadId'])
+
                 ma.add_parts_from_file(file_path)
+
                 try:
                     ma.upload(**upload_kwargs)
                 except:
                     print("Connection failure. Retry with Upload ID {}".format(ma.manifest['uploadId']))
                 response = ma.commit()
-
                 return response
     
 
