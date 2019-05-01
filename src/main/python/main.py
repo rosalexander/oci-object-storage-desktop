@@ -180,6 +180,8 @@ class CentralWidget(QWidget):
         self.compartment_tree = n1
         self.layout.insertWidget(1, self.compartment_tree)
 
+        self.bucket_tree.itemClicked.connect(self.select_bucket)
+
         if prev_compartment:
             self.select_compartment(self.compartment_tree.itemAt(prev_compartment))
         if prev_bucket:
