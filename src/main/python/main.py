@@ -584,15 +584,16 @@ class UploadThread(QThread):
         self.os_client = oci_manager.get_os()
         self.namespace = oci_manager.get_namespace()
         self.upload_manager = oci_manager.get_upload_manager()
-        self.upload_id = UploadId()
-        self.upload_id.test.connect(self.test)
+        self.upload_id_manager = UploadId()
+        self.upload_id = None
+        self.upload_id_manager.test.connect(self.log_id)
         self.filesizes = filesizes
         self.threadactive = True
         self.setTerminationEnabled()
 
-    def test(self, id):
-        print("Hello world!")
-        print(id)
+    def log_id(self, id):
+        print("Upload ID: {}".format(id))
+        self.upload_id = id
     
     def connection_failed(self):
         print("Connection failed")
@@ -616,6 +617,8 @@ class UploadThread(QThread):
 
     def stop(self):
         print("Connection stopped")
+        self.threadactive = False
+        self.upload_manager.abort(self.upload_id)
         self.wait()
     
     def upload_file(self, file, object_name):
@@ -625,7 +628,7 @@ class UploadThread(QThread):
         :param file: The absolute path of the file
         :type file: string
         """
-        response = self.upload_manager.upload_file(self.namespace, self.bucket_name, object_name, file, progress_callback=self.progress_callback, mixin=self.upload_id)
+        response = self.upload_manager.upload_file(self.namespace, self.bucket_name, object_name, file, progress_callback=self.progress_callback, mixin=self.upload_id_manager)
         print(response)
         return response
     
@@ -634,10 +637,10 @@ class UploadThread(QThread):
 
         """
         for i, file in enumerate(self.files[0]):
-            if os.path.isfile(file):
+            if os.path.isfile(file) and self.threadactive:
                 self.upload_file(file, file.split('/')[-1])
                 self.file_uploaded.emit(file.split('/')[-1], " ".join(self.filesizes[i][1]))
-            elif os.path.isdir(file):
+            elif os.path.isdir(file) and self.threadactive:
                 split_dir = file.split('/')
                 dir_length = len(file) - len(split_dir[-2]) - 1
                 root_dir = True

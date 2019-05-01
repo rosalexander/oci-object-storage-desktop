@@ -110,12 +110,21 @@ class UploadId(QObject):
     test = Signal(str)
     def __init__(self):
         super().__init__()
+        self.id = None
     def signal_upload_id(self, upload_id):
         self.test.emit(upload_id)
+        self.id = upload_id
 
 class UploadManager(oci.object_storage.UploadManager):
     def __init__(self, object_storage_client):
         super().__init__(object_storage_client)
+        self.ma = None
+    
+    def abort(self, upload_id):
+        if self.ma:
+            self.ma.abort(upload_id = upload_id) if upload_id else self.ma.abort()
+
+        
     
     def upload_file(self,
                     namespace_name,
@@ -206,6 +215,8 @@ class UploadManager(oci.object_storage.UploadManager):
                                               object_name,
                                               **kwargs)
 
+                self.ma = ma
+
                 upload_kwargs = {}
                 if 'progress_callback' in kwargs:
                     upload_kwargs['progress_callback'] = kwargs['progress_callback']
@@ -219,10 +230,11 @@ class UploadManager(oci.object_storage.UploadManager):
 
                 try:
                     ma.upload(**upload_kwargs)
+                    response = ma.commit()
                 except:
                     print("Connection failure. Retry with Upload ID {}".format(ma.manifest['uploadId']))
-                response = ma.commit()
-                return response
+                else:
+                    return response
     
 
 
