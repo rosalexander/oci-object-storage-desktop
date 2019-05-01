@@ -6,6 +6,7 @@ from oci_manager import oci_manager, UploadId
 from config import ConfigWindow
 from progress import ProgressWindow
 from util import get_filesize
+from upload_thread import UploadThread
 import sys
 import os
 
@@ -231,22 +232,12 @@ class CentralWidget(QWidget):
         upload_thread.all_files_uploaded.connect(self.all_files_uploaded)
         progress_thread.cancel_signal.connect(self.file_upload_canceled)
 
-
         self.progress_threads[c] = progress_thread
         self.upload_threads[c] = upload_thread
 
         self.progress_threads[c].show()
         self.upload_threads[c].start()
 
-        # self.progress_window = ProgressWindow(files, filesizes)
-        # self.upload_thread = UploadThread(files, bucket_name, self.oci_manager, filesizes)
-        # self.upload_thread.file_uploaded.connect(self.progress_window.next_file)
-        # self.upload_thread.file_uploaded.connect(self.file_uploaded)
-        # self.upload_thread.bytes_uploaded.connect(self.progress_window.set_progress)
-        # self.progress_window.cancel.clicked.connect(self.file_upload_canceled)
-        # self.progress_window.show()
-        # self.upload_thread.start()
-    
     def file_uploaded(self, filename, filesize):
         """
         TODO: Return some information when a file upload job completes
@@ -554,7 +545,7 @@ class MainMenu(QMenuBar):
         self.config_window = config_window
         # self.config_window.setParent(self)
         self.setNativeMenuBar(True)
-        test_menu = self.addMenu('&Test')
+        test_menu = self.addMenu('')
         for text in ["About", "Preferences"]:
             action = test_menu.addAction(text)
             action.setMenuRole(QAction.ApplicationSpecificRole)
@@ -579,100 +570,6 @@ class MainMenu(QMenuBar):
         Change the profile
         """
         self.parentWidget().change_profile(new_profile)
-
-class UploadThread(QThread):
-
-    file_uploaded = Signal(str, str)
-    bytes_uploaded = Signal(int)
-    all_files_uploaded = Signal(int)
-    upload_failed = Signal(int)
-
-    def __init__(self, files, bucket_name, oci_manager, filesizes, thread_id):
-        """
-        UploadThread allows upload jobs to run in a differen;t thread than the application, so the application doesn't stall or freeze
-        
-        :param files: A tuple of files. First element is a list of absolute paths to the files. Second element is the mimetype of files
-        :type files: tuple
-        :param bucket_name: The name of the bucket for uploading into
-        :type bucket_name: string
-        :param oci_manager: The OCI manager to use for OCI related tasks
-        :type: :class: 'oci_manager.oci_manager'
-        """
-        super().__init__()
-        self.files = files
-        self.bucket_name = bucket_name
-        self.os_client = oci_manager.get_os()
-        self.namespace = oci_manager.get_namespace()
-        self.upload_manager = oci_manager.get_upload_manager()
-        self.upload_id_manager = UploadId()
-        self.upload_id = None
-        self.upload_id_manager.test.connect(self.log_id)
-        self.filesizes = filesizes
-        self.threadactive = True
-        self.setTerminationEnabled()
-        self.thread_id = thread_id
-
-    def log_id(self, id):
-        print("Upload ID: {}".format(id))
-        self.upload_id = id
-    
-    def connection_failed(self):
-        print("Connection failed")
-        self.upload_failed = Signal()
-    
-    def connection_canceled(self):
-        print("Connection cancelled")
-        self.quit()
-    
-    def progress_callback(self, bits):
-        """
-        Callback function for the uploading
-
-        :param bits: The amount of bits uploaded
-        :type bits: int
-        """
-        self.bytes_uploaded.emit(bits)
-        
-    def __del__(self):
-        self.wait()
-
-    def stop(self):
-        print("Connection stopped")
-        self.threadactive = False
-        self.upload_manager.abort(self.upload_id)
-        self.wait()
-    
-    def upload_file(self, file, object_name):
-        """
-        Upload the file and pass in a callback function
-
-        :param file: The absolute path of the file
-        :type file: string
-        """
-        response = self.upload_manager.upload_file(self.namespace, self.bucket_name, object_name, file, progress_callback=self.progress_callback, mixin=self.upload_id_manager)
-        print(response)
-        return response
-    
-    def run(self):
-        """
-
-        """
-        for i, file in enumerate(self.files[0]):
-            if os.path.isfile(file) and self.threadactive:
-                self.upload_file(file, file.split('/')[-1])
-                self.file_uploaded.emit(file.split('/')[-1], " ".join(self.filesizes[i][1]))
-            elif os.path.isdir(file) and self.threadactive:
-                split_dir = file.split('/')
-                dir_length = len(file) - len(split_dir[-2]) - 1
-                root_dir = True
-                for dir, _, filenames in os.walk(file):
-                    for filename in filenames:
-                        subfile = "{}/{}".format(dir, filename) if not root_dir else "{}{}".format(dir, filename)
-                        print(subfile[dir_length:])
-                        self.upload_file(subfile, subfile[dir_length:])
-                        self.file_uploaded.emit(file.split('/')[-1], " ".join(self.filesizes[i][1]))
-                    root_dir = False
-        self.all_files_uploaded.emit(self.thread_id)
 
 if __name__ == '__main__':
     appctxt = AppContext()
