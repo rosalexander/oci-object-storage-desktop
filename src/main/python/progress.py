@@ -8,8 +8,10 @@ from PySide2.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxL
 byte_type = {'KB':0, 'MB':1, 'GB':2, 'TB':3, 'PB':4}
 
 class ProgressWindow(QWidget):
+
+    cancel_signal = Signal(int)
     
-    def __init__(self, files, filesizes):
+    def __init__(self, files, filesizes, thread_id):
         super().__init__()
         print(len(files[0]), len(filesizes))
         print(files[0])
@@ -30,7 +32,7 @@ class ProgressWindow(QWidget):
         self.layout = QVBoxLayout()
         self.cancel = QPushButton()
         self.cancel.setText("Cancel")
-        self.cancel.clicked.connect(self.hide)
+        self.cancel.clicked.connect(self.cancel_handler)
 
         self.ok = QPushButton()
         self.ok.setText("OK")
@@ -54,6 +56,8 @@ class ProgressWindow(QWidget):
         self.layout.addWidget(self.size_label)
         self.layout.addWidget(self.button_box)
         self.setLayout(self.layout)
+
+        self.thread_id = thread_id
     
     def test(self):
         self.calc = TestProgress()
@@ -88,6 +92,12 @@ class ProgressWindow(QWidget):
     def connection_failed(self):
         self.connection_failed_label = QLabel()
         self.connection_failed_label.setText("Connection failed")
+    
+    def cancel_handler(self):
+        self.cancel_signal.emit(self.thread_id)
+        self.hide()
+    
+
 
 class TestProgress(QThread):
 

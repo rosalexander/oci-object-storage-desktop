@@ -110,6 +110,11 @@ class CentralWidget(QWidget):
         self.layout.addWidget(self.obj_tree)
         self.setLayout(self.layout)
 
+        self.upload_threads = {}
+        self.upload_thread_count = 0
+        self.progress_threads = {}
+        self.progress_thread_count = 0
+
     def refresh(self, profile=None, prev_compartment=None, prev_bucket=None):
         """
         Fetchs all TreeWidgets and window title information using the given profile
@@ -214,14 +219,33 @@ class CentralWidget(QWidget):
         for file in files[0]:
             filesizes.append(get_filesize(file))
 
-        self.progress_window = ProgressWindow(files, filesizes)
-        self.upload_thread = UploadThread(files, bucket_name, self.oci_manager, filesizes)
-        self.upload_thread.file_uploaded.connect(self.progress_window.next_file)
-        self.upload_thread.file_uploaded.connect(self.file_uploaded)
-        self.upload_thread.bytes_uploaded.connect(self.progress_window.set_progress)
-        self.progress_window.cancel.clicked.connect(self.file_upload_canceled)
-        self.progress_window.show()
-        self.upload_thread.start()
+        c = self.progress_thread_count
+        self.progress_thread_count += 1
+        self.upload_thread_count += 1
+
+        progress_thread = ProgressWindow(files, filesizes, c)
+        upload_thread = UploadThread(files, bucket_name, self.oci_manager, filesizes, c)
+        upload_thread.file_uploaded.connect(progress_thread.next_file)
+        upload_thread.file_uploaded.connect(self.file_uploaded)
+        upload_thread.bytes_uploaded.connect(progress_thread.set_progress)
+        upload_thread.all_files_uploaded.connect(self.all_files_uploaded)
+        progress_thread.cancel_signal.connect(self.file_upload_canceled)
+
+
+        self.progress_threads[c] = progress_thread
+        self.upload_threads[c] = upload_thread
+
+        self.progress_threads[c].show()
+        self.upload_threads[c].start()
+
+        # self.progress_window = ProgressWindow(files, filesizes)
+        # self.upload_thread = UploadThread(files, bucket_name, self.oci_manager, filesizes)
+        # self.upload_thread.file_uploaded.connect(self.progress_window.next_file)
+        # self.upload_thread.file_uploaded.connect(self.file_uploaded)
+        # self.upload_thread.bytes_uploaded.connect(self.progress_window.set_progress)
+        # self.progress_window.cancel.clicked.connect(self.file_upload_canceled)
+        # self.progress_window.show()
+        # self.upload_thread.start()
     
     def file_uploaded(self, filename, filesize):
         """
@@ -232,11 +256,17 @@ class CentralWidget(QWidget):
         obj_tree_item.setText(0, filename)
         obj_tree_item.setText(1, filesize)
     
-    def file_upload_canceled(self):
-        # print("Connection cancelled")
-        # self.upload_thread.quit()
-        # self.upload_thread.wait()
-        self.upload_thread.stop()
+    def all_files_uploaded(self, thread_id):
+        if thread_id in self.upload_threads:
+            del self.upload_threads[thread_id]
+    
+    
+    def file_upload_canceled(self, thread_id):
+        self.upload_threads[thread_id].stop()
+        if thread_id in self.upload_threads:
+            del self.upload_threads[thread_id]
+        if thread_id in self.progress_threads:
+            del self.progress_threads[thread_id]
 
     def get_compartment_tree(self):
         """
@@ -484,14 +514,12 @@ class Tree(QTreeWidget):
         """
         print(e.mimeData().urls())
         files = []
-        filesizes = []
 
         for url in e.mimeData().urls():
             file = url.toLocalFile()
 
             if os.path.isfile(file):
                 files.append(file)
-                filesizes.append(get_filesize(file))
                 
             elif os.path.isdir(file):
                 root_dir = True
@@ -499,17 +527,9 @@ class Tree(QTreeWidget):
                     for filename in filenames:
                         subfile = "{}/{}".format(dir, filename) if not root_dir else "{}{}".format(dir, filename)
                         files.append(subfile)
-                        filesizes.append(get_filesize(subfile))
                     root_dir = False
 
-        self.progress_window = ProgressWindow((files, "All files"), filesizes)
-        self.upload_thread = UploadThread((files, "All files"), self.bucket_name, self.oci_manager, filesizes)
-        self.upload_thread.file_uploaded.connect(self.progress_window.next_file)
-        self.upload_thread.file_uploaded.connect(self.file_uploaded)
-        self.upload_thread.bytes_uploaded.connect(self.progress_window.set_progress)
-        self.progress_window.cancel.clicked.connect(self.upload_thread.stop)
-        self.progress_window.show()
-        self.upload_thread.start()
+        self.parentWidget().upload_files((files, "All files"), self.bucket_name)
     
     def file_uploaded(self, filename, filesize):
         """
@@ -564,10 +584,10 @@ class UploadThread(QThread):
 
     file_uploaded = Signal(str, str)
     bytes_uploaded = Signal(int)
-    all_files_uploaded = Signal()
-    upload_failed = Signal()
+    all_files_uploaded = Signal(int)
+    upload_failed = Signal(int)
 
-    def __init__(self, files, bucket_name, oci_manager, filesizes):
+    def __init__(self, files, bucket_name, oci_manager, filesizes, thread_id):
         """
         UploadThread allows upload jobs to run in a differen;t thread than the application, so the application doesn't stall or freeze
         
@@ -590,6 +610,7 @@ class UploadThread(QThread):
         self.filesizes = filesizes
         self.threadactive = True
         self.setTerminationEnabled()
+        self.thread_id = thread_id
 
     def log_id(self, id):
         print("Upload ID: {}".format(id))
@@ -651,7 +672,7 @@ class UploadThread(QThread):
                         self.upload_file(subfile, subfile[dir_length:])
                         self.file_uploaded.emit(file.split('/')[-1], " ".join(self.filesizes[i][1]))
                     root_dir = False
-        self.all_files_uploaded.emit()
+        self.all_files_uploaded.emit(self.thread_id)
 
 if __name__ == '__main__':
     appctxt = AppContext()
