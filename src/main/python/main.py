@@ -31,6 +31,16 @@ class AppContext(ApplicationContext):
 
 class MainWindow(QMainWindow):
     def __init__(self, main_menu, central_widget, config_window):
+        """
+        Wrapper to connect the central widget and menu bar together and also the config window.
+
+        :param main_menu: The menu toolbar on the top of the application
+        :type main_menu: class 'Menu'
+        :param central_widget: The central widget of the main window
+        :type central_widget: class 'CentralWidget'
+        :param config_window: The window with holds the config settings
+        :type config_window: class 'config.ConfigWindow'
+        """
         super().__init__()
         
         self.central_widget = central_widget
@@ -38,6 +48,10 @@ class MainWindow(QMainWindow):
         self.config_window = config_window
         self.config_window.main_window = self
         self.menubar.config_window = self.config_window
+
+        self.menubar.compartment_view.triggered.connect(self.central_widget.compartment_tree.toggle)
+        self.menubar.bucket_view.triggered.connect(self.central_widget.bucket_tree.toggle)
+        self.menubar.object_view.triggered.connect(self.central_widget.obj_tree.toggle)
 
         self.setCentralWidget(self.central_widget)
         self.setWindowTitle(self.central_widget.windowTitle())
@@ -70,6 +84,10 @@ class MainWindow(QMainWindow):
 class CentralWidget(QWidget):
     
     def __init__(self):
+        """
+        The central hub for the application. Contains the tree views for compartments, buckets, and objects.
+        Has buttons for uploading files and creating buckets
+        """
         super().__init__()
         self.setWindowTitle("OCI Object Storage: Not Connected")
         self.setMinimumSize(800, 600)
@@ -86,6 +104,8 @@ class CentralWidget(QWidget):
 
         self.bucket_tree = self.get_placeholder_tree('Buckets', 'No compartment selected')
         self.obj_tree = self.get_placeholder_tree('Objects', 'No bucket selected')
+
+        self.bucket_tree.itemClicked.connect(self.select_bucket)
 
         button = QPushButton('Upload Files')
         button.clicked.connect(self.select_files)
@@ -240,7 +260,14 @@ class CentralWidget(QWidget):
 
     def file_uploaded(self, filename, filesize):
         """
-        TODO: Return some information when a file upload job completes
+        When a file is uploaded then we add the filename and the filesize to the object tree view
+
+        :param filename: The name of the file
+        :type filename: string
+        :param filesize: The filesize in format of numeric then abbreviated units e.g '128 KB'
+        :type filesize: string
+
+        TODO: Fix bug where changing the tree during mid upload will add text to that tree.
         """
         print(filename, filesize, "Uploaded")
         obj_tree_item = QTreeWidgetItem(self.obj_tree)
@@ -248,11 +275,23 @@ class CentralWidget(QWidget):
         obj_tree_item.setText(1, filesize)
     
     def all_files_uploaded(self, thread_id):
+        """
+        Deletes the upload thread from the dictionary of upload threads when it completes
+
+        :param thread_id: The id given to the thread upon creation
+        :type thread_id: int
+        """
         if thread_id in self.upload_threads:
             del self.upload_threads[thread_id]
     
     
     def file_upload_canceled(self, thread_id):
+        """
+        Deletes the upload thread and progress window threads from their respective dictionaries when the job is cancelled
+
+        :param thread_id: The id given to the threads upon creation
+        :type thread_id: int
+        """
         self.upload_threads[thread_id].stop()
         if thread_id in self.upload_threads:
             del self.upload_threads[thread_id]
@@ -317,14 +356,15 @@ class CentralWidget(QWidget):
         :param item: The selected compartment tree item
         :type item: QTreeWidgetItem
         """
-        self.layout.removeItem(self.layout.itemAt(2))
-        self.bucket_tree.setParent(None)
-        self.bucket_tree = self.get_buckets_tree(item.text(1))
-        self.layout.insertWidget(2, self.bucket_tree)
-        self.layout.removeItem(self.layout.itemAt(3))
-        self.obj_tree.setParent(None)
-        self.obj_tree = self.get_placeholder_tree('Objects', 'No bucket selected')
-        self.layout.insertWidget(3, self.obj_tree)
+        if not item.isDisabled():
+            # self.layout.removeItem(self.layout.itemAt(2))
+            # self.bucket_tree.setParent(None)
+            self.get_buckets_tree_safe(item.text(1))
+            # self.layout.insertWidget(2, self.bucket_tree)
+            # self.layout.removeItem(self.layout.itemAt(3))
+            # self.obj_tree.setParent(None)
+            self.get_objects_tree_safe(None)
+            # self.layout.insertWidget(3, self.obj_tree)
     
     def get_buckets_tree(self, ocid):
         """
@@ -361,6 +401,40 @@ class CentralWidget(QWidget):
 
         return tree_widget
     
+    def get_buckets_tree_safe(self, ocid):
+        """
+        Constructs a tree widget that displays a list of buckets
+
+        :param ocid: The OCID of the compartment
+        :type ocid: string
+
+        :return: A tree widget that displays a list of buckets
+        :rtype :class: QTreeWidget
+        """
+        namespace = self.oci_manager.get_namespace()
+        self.bucket_tree.clear()
+        data = []
+        try:
+            data = self.oci_manager.get_os().list_buckets(namespace, ocid).data
+        except:
+            print("You do not have authorization to perform this request, or the requested resource could not be found")
+            bucket_tree_item = QTreeWidgetItem(self.bucket_tree)
+            bucket_tree_item.setText(0, 'You do not have authorization to perform this request, or the requested resource could not be found')
+            bucket_tree_item.setTextColor(0, QColor(220,220,220))
+            bucket_tree_item.setDisabled(True)
+        finally:
+            if not data:
+                bucket_tree_item = QTreeWidgetItem(self.bucket_tree)
+                bucket_tree_item.setText(0, 'Compartment contains no buckets')
+                bucket_tree_item.setTextColor(0, QColor(220,220,220))
+                bucket_tree_item.setDisabled(True)
+            else:
+                for bucket in data:
+                    print(bucket.name)
+                    bucket_tree_item = QTreeWidgetItem(self.bucket_tree)
+                    bucket_tree_item.setText(0, bucket.name)
+                # self.bucket_tree.itemClicked.connect(self.select_bucket)
+    
     def select_bucket(self, item):
         """
         Slot to populate the object list view when a bucket is activated
@@ -368,10 +442,11 @@ class CentralWidget(QWidget):
         :param item: The selected bucket tree item
         :type item: QTreeWidgetItem
         """
-        self.layout.removeItem(self.layout.itemAt(3))
-        self.obj_tree.setParent(None)
-        self.obj_tree = self.get_objects_tree(item.text(0))
-        self.layout.insertWidget(3, self.obj_tree)
+        if not item.isDisabled():
+            # self.layout.removeItem(self.layout.itemAt(3))
+            # self.obj_tree.setParent(None)
+            self.get_objects_tree_safe(item.text(0))
+            # self.layout.insertWidget(3, self.obj_tree)
     
     def get_objects_tree(self, bucket_name):
         """
@@ -405,9 +480,48 @@ class CentralWidget(QWidget):
             byte_size = round(byte_size, 2)
             obj_tree_item.setText(1, "{} {}".format(str(byte_size), byte_type[byte_type_pointer]))
 
-        
         return tree_widget
 
+    def get_objects_tree_safe(self, bucket_name):
+        """
+        Constructs a tree widget that displays a list of objects in a bucket
+
+        :param bucket_name: The name of the bucket
+        :type bucket_name: string
+
+        :return: A tree widget that displays a directory of compartments and subcompartments
+        :rtype :class: QTreeWidget
+        """
+        self.obj_tree.clear()
+        if bucket_name:
+            if not self.obj_tree.accept_drop:
+                self.obj_tree.accept_drop = True
+                self.obj_tree.object_tree_init()
+            if not self.obj_tree.oci_manager:
+                self.obj_tree.oci_manager = self.oci_manager
+            self.obj_tree.bucket_name = bucket_name
+            namespace = self.oci_manager.get_namespace()
+            byte_type = ['KB', 'MB', 'GB', 'TB', 'PB']
+
+            data = self.oci_manager.get_os().list_objects(namespace, bucket_name, fields='size').data.objects
+            for obj in data:
+                print(obj.name)
+                obj_tree_item = QTreeWidgetItem(self.obj_tree)
+                obj_tree_item.setText(0, obj.name)
+                byte_type_pointer = 0
+                byte_size = obj.size/1024.0
+                while byte_size > 1024:
+                    byte_size = byte_size/1024.0
+                    byte_type_pointer += 1
+                byte_size = round(byte_size, 2)
+                obj_tree_item.setText(1, "{} {}".format(str(byte_size), byte_type[byte_type_pointer]))
+        else:
+            tree_item = QTreeWidgetItem(self.obj_tree)
+            tree_item.setText(0, "No bucket selected")
+            tree_item.setTextColor(0, QColor(220,220,220))
+            tree_item.setDisabled(True)
+            self.obj_tree.accept_drop = False
+            
     def get_placeholder_tree(self, header, text):
         """
         Create a placeholder tree widget for situations where real object storage information is not fetched
@@ -425,6 +539,7 @@ class CentralWidget(QWidget):
         tree_item = QTreeWidgetItem(tree_widget)
         tree_item.setText(0, text)
         tree_item.setTextColor(0, QColor(220,220,220))
+        tree_item.setDisabled(True)
         return tree_widget
 
 
@@ -457,11 +572,10 @@ class Tree(QTreeWidget):
         :type: oci_manager :class: 'oci_manager.oci_manager'
         """
         super(Tree, self).__init__()
-        # self.setDefaultDropAction(Qt.MoveAction)
-        # self.setDragDropMode(QAbstractItemView.DragDrop)
         
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         
+        self.accept_drop = accept_drop
         if accept_drop:
             self.customContextMenuRequested.connect(self.object_context_menu)
             self.setAcceptDrops(accept_drop)
@@ -469,7 +583,11 @@ class Tree(QTreeWidget):
         self.bucket_name = bucket_name
         self.oci_manager = oci_manager
 
-    
+    def object_tree_init(self):
+        self.customContextMenuRequested.connect(self.object_context_menu)
+        self.setAcceptDrops(True)
+        self.setSelectionMode(QAbstractItemView.ExtendedSelection)
+
     def dragEnterEvent(self, e):
         if e.mimeData().hasUrls():
             e.acceptProposedAction()
@@ -483,13 +601,17 @@ class Tree(QTreeWidget):
             e.ignore()
     
     def object_context_menu(self):
-        menu = QMenu(self)
-        upload_action = menu.addAction("Upload file(s)")
-        delete_action = menu.addAction("Delete file(s)")
-        if not self.selectedItems():
-            delete_action.setEnabled(False)
-        delete_action.triggered.connect(self.delete_objects)
-        menu.exec_(QCursor.pos())
+        """
+        Context menu when the object tree is right clicked
+        """
+        if self.accept_drop:
+            menu = QMenu(self)
+            upload_action = menu.addAction("Upload file(s)")
+            delete_action = menu.addAction("Delete file(s)")
+            if not self.selectedItems():
+                delete_action.setEnabled(False)
+            delete_action.triggered.connect(self.delete_objects)
+            menu.exec_(QCursor.pos())
     
     def delete_objects(self):
         items = self.selectedItems()
@@ -503,24 +625,25 @@ class Tree(QTreeWidget):
 
         TODO: Use signals/slots
         """
-        print(e.mimeData().urls())
-        files = []
+        if self.accept_drop:
+            print(e.mimeData().urls())
+            files = []
 
-        for url in e.mimeData().urls():
-            file = url.toLocalFile()
+            for url in e.mimeData().urls():
+                file = url.toLocalFile()
 
-            if os.path.isfile(file):
-                files.append(file)
-                
-            elif os.path.isdir(file):
-                root_dir = True
-                for dir, _, filenames in os.walk(file):
-                    for filename in filenames:
-                        subfile = "{}/{}".format(dir, filename) if not root_dir else "{}{}".format(dir, filename)
-                        files.append(subfile)
-                    root_dir = False
+                if os.path.isfile(file):
+                    files.append(file)
+                    
+                elif os.path.isdir(file):
+                    root_dir = True
+                    for dir, _, filenames in os.walk(file):
+                        for filename in filenames:
+                            subfile = "{}/{}".format(dir, filename) if not root_dir else "{}{}".format(dir, filename)
+                            files.append(subfile)
+                        root_dir = False
 
-        self.parentWidget().upload_files((files, "All files"), self.bucket_name)
+            self.parentWidget().upload_files((files, "All files"), self.bucket_name)
     
     def file_uploaded(self, filename, filesize):
         """
@@ -532,8 +655,17 @@ class Tree(QTreeWidget):
         obj_tree_item.setText(1, filesize)
 
         return None
+    
+    def toggle(self):
+        if self.isVisible():
+            self.hide()
+        else:
+            self.show()
 
 class MainMenu(QMenuBar):
+
+    toggle_compartment = Signal()
+
     def __init__(self, config_window=None):
         """
         Widget to display menu actions at the top of the application
@@ -555,7 +687,20 @@ class MainMenu(QMenuBar):
         self.edit_menu = self.addMenu('&Edit')
         profile_action = self.edit_menu.addAction("Profile Settings")
         profile_action.triggered.connect(self.settings)
-        # self.view_menu = self.addMenu('&View')
+        self.view_menu = self.addMenu('&View')
+
+        self.compartment_view = self.view_menu.addAction("Compartments")
+        self.compartment_view.setCheckable(True)
+        self.compartment_view.setChecked(True)
+
+        self.bucket_view = self.view_menu.addAction("Buckets")
+        self.bucket_view.setCheckable(True)
+        self.bucket_view.setChecked(True)
+        
+        self.object_view = self.view_menu.addAction("Objects")
+        self.object_view.setCheckable(True)
+        self.object_view.setChecked(True)
+
     
     def settings(self):
         """
@@ -570,6 +715,8 @@ class MainMenu(QMenuBar):
         Change the profile
         """
         self.parentWidget().change_profile(new_profile)
+
+
 
 if __name__ == '__main__':
     appctxt = AppContext()

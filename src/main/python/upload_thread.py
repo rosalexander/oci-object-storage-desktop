@@ -41,6 +41,12 @@ class UploadThread(QThread):
         self.thread_id = thread_id
 
     def log_id(self, id):
+        """
+        Slot that prints the upload id when a new upload is created
+
+        :param id: Upload ID of upload
+        :type id: string
+        """
         print("Upload ID: {}".format(id))
         self.upload_id = id
     
