@@ -39,10 +39,15 @@ class ProgressWindow(QWidget):
         self.ok.setEnabled(False)
         self.ok.clicked.connect(self.hide)
 
+        self.retry = QPushButton()
+        self.retry.setText("Retry")
+        self.retry.setEnabled(False)
+
         self.button_box = QDialogButtonBox()
         self.button_box.setOrientation(Qt.Horizontal)
         self.button_box.addButton(self.ok, QDialogButtonBox.ActionRole)
         self.button_box.addButton(self.cancel, QDialogButtonBox.ActionRole)
+        self.button_box.addButton(self.retry, QDialogButtonBox.ActionRole)
 
         # self.button.clicked.connect(self.test)
         self.progress = QProgressBar(self)
@@ -55,6 +60,14 @@ class ProgressWindow(QWidget):
         self.layout.addWidget(self.progress)
         self.layout.addWidget(self.size_label)
         self.layout.addWidget(self.button_box)
+
+
+        self.retry_label = QLabel()
+        self.retry_label.setText("Connection failed")
+        self.retry_label.setStyleSheet("QLabel {color: red; }")
+        self.layout.addWidget(self.retry_label)
+        self.retry_label.setVisible(False)
+
         self.setLayout(self.layout)
 
         self.thread_id = thread_id
@@ -65,6 +78,8 @@ class ProgressWindow(QWidget):
         self.calc.start()
 
     def next_file(self, *args):
+        self.retry_label.setVisible(False)
+        self.retry.setEnabled(False)
         if self.files_uploaded < self.files_len:
             self.files_uploaded += 1
             self.setWindowTitle("Uploading Files ({}/{})".format(self.files_uploaded, self.files_len))
@@ -96,6 +111,16 @@ class ProgressWindow(QWidget):
     def cancel_handler(self):
         self.cancel_signal.emit(self.thread_id)
         self.hide()
+    
+    def retry_handler(self):
+        print("Retry handler")
+        # self.retry_label = QLabel()
+        # self.retry_label.setText("Connection failed")
+        # self.retry_label.setStyleSheet("QLabel {color: red; }")
+        # self.layout.addWidget(self.retry_label)
+        self.retry_label.setVisible(True)
+        self.retry.setEnabled(True)
+
     
 
 

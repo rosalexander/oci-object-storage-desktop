@@ -13,7 +13,7 @@ class UploadThread(QThread):
     file_uploaded = Signal(str, str)
     bytes_uploaded = Signal(int)
     all_files_uploaded = Signal(int)
-    upload_failed = Signal(int)
+    upload_failed = Signal()
 
     def __init__(self, files, bucket_name, oci_manager, filesizes, thread_id):
         """
@@ -40,6 +40,8 @@ class UploadThread(QThread):
         self.setTerminationEnabled()
         self.thread_id = thread_id
 
+        self.current_upload = None
+
     def log_id(self, id):
         """
         Slot that prints the upload id when a new upload is created
@@ -50,9 +52,19 @@ class UploadThread(QThread):
         print("Upload ID: {}".format(id))
         self.upload_id = id
     
+    def retry(self):
+        try:
+            self.upload_manager.resume_upload_file(self.namespace, self.bucket_name, self.current_upload["object_name"],\
+                    self.current_upload["file_path"], self.upload_id, progress_callback=self.progress_callback, mixin=self.upload_id_manager, part_size=10485760)
+        except:
+            print("Retry connection failed")
+            self.connection_failed()
+        else:
+            self.file_uploaded.emit(self.current_upload["object_name"], self.current_upload["filesize"])
+    
     def connection_failed(self):
         print("Connection failed")
-        self.upload_failed = Signal()
+        self.upload_failed.emit()
     
     def connection_canceled(self):
         print("Connection cancelled")
@@ -83,9 +95,13 @@ class UploadThread(QThread):
         :param file: The absolute path of the file
         :type file: string
         """
-        response = self.upload_manager.upload_file(self.namespace, self.bucket_name, object_name, file, progress_callback=self.progress_callback, mixin=self.upload_id_manager)
-        print(response)
-        return response
+        try:
+            response = self.upload_manager.upload_file(self.namespace, self.bucket_name, object_name, file, progress_callback=self.progress_callback, mixin=self.upload_id_manager, part_size=10485760)
+        except:
+            self.connection_failed()
+        else:
+            print(response)
+            return response
     
     def run(self):
         """
@@ -93,8 +109,10 @@ class UploadThread(QThread):
         """
         for i, file in enumerate(self.files[0]):
             if os.path.isfile(file) and self.threadactive:
-                self.upload_file(file, file.split('/')[-1])
-                self.file_uploaded.emit(file.split('/')[-1], " ".join(self.filesizes[i][1]))
+                self.current_upload = {"object_name":file.split('/')[-1], "file_path":file, "filesize": " ".join(self.filesizes[i][1])}
+                response = self.upload_file(file, file.split('/')[-1])
+                if response:
+                    self.file_uploaded.emit(file.split('/')[-1], " ".join(self.filesizes[i][1]))
             elif os.path.isdir(file) and self.threadactive:
                 split_dir = file.split('/')
                 dir_length = len(file) - len(split_dir[-2]) - 1
@@ -103,7 +121,9 @@ class UploadThread(QThread):
                     for filename in filenames:
                         subfile = "{}/{}".format(dir, filename) if not root_dir else "{}{}".format(dir, filename)
                         print(subfile[dir_length:])
-                        self.upload_file(subfile, subfile[dir_length:])
-                        self.file_uploaded.emit(file.split('/')[-1], " ".join(self.filesizes[i][1]))
+                        self.current_upload = {"object_name":subfile[dir_length:], "file_path":subfile, "filesize": " ".join(self.filesizes[i][1])}
+                        response = self.upload_file(subfile, subfile[dir_length:])
+                        if response:
+                            self.file_uploaded.emit(file.split('/')[-1], " ".join(self.filesizes[i][1]))
                     root_dir = False
         self.all_files_uploaded.emit(self.thread_id)

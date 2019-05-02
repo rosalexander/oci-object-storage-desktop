@@ -252,7 +252,9 @@ class CentralWidget(QWidget):
         upload_thread.file_uploaded.connect(self.file_uploaded)
         upload_thread.bytes_uploaded.connect(progress_thread.set_progress)
         upload_thread.all_files_uploaded.connect(self.all_files_uploaded)
+        upload_thread.upload_failed.connect(progress_thread.retry_handler)
         progress_thread.cancel_signal.connect(self.file_upload_canceled)
+        progress_thread.retry.clicked.connect(upload_thread.retry)
 
         self.progress_threads[c] = progress_thread
         self.upload_threads[c] = upload_thread

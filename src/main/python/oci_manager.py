@@ -119,12 +119,18 @@ class UploadManager(oci.object_storage.UploadManager):
     def __init__(self, object_storage_client):
         super().__init__(object_storage_client)
         self.ma = None
-    
+
+    def commit(self):
+        self.ma.commit()
+
     def abort(self, upload_id):
         if self.ma:
-            self.ma.abort(upload_id = upload_id) if upload_id else self.ma.abort()
+            self.ma.abort(upload_id=upload_id) if upload_id else self.ma.abort()
 
-        
+    def resume(self, upload_id):
+        if self.ma:
+            self.ma.resume()
+            # self.ma.resume(upload_id=upload_id) if upload_id else self.ma.resume()
     
     def upload_file(self,
                     namespace_name,
@@ -186,7 +192,7 @@ class UploadManager(oci.object_storage.UploadManager):
             it will contain the :code:`opc-content-md5 header`.
         :rtype: :class:`~oci.response.Response`
         """
-        part_size = STREAMING_DEFAULT_PART_SIZE
+        part_size = DEFAULT_PART_SIZE
         if 'part_size' in kwargs:
             part_size = kwargs['part_size']
             kwargs.pop('part_size')
@@ -228,13 +234,17 @@ class UploadManager(oci.object_storage.UploadManager):
 
                 ma.add_parts_from_file(file_path)
 
-                try:
-                    ma.upload(**upload_kwargs)
-                    response = ma.commit()
-                except:
-                    print("Connection failure. Retry with Upload ID {}".format(ma.manifest['uploadId']))
-                else:
-                    return response
+                # try:
+                #     ma.upload(**upload_kwargs)
+                #     response = ma.commit()
+                # except:
+                #     print("Connection failure. Retry with Upload ID {}".format(ma.manifest['uploadId']))
+                # else:
+                #     return response
+                
+                ma.upload(**upload_kwargs)
+                response = ma.commit()
+                return response
     
 
 
