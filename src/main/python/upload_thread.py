@@ -27,7 +27,7 @@ class UploadThread(QThread):
         :type: :class: 'oci_manager.oci_manager'
         """
         super().__init__()
-        self.files = files
+        self.files = files[0].copy()
         self.bucket_name = bucket_name
         self.os_client = oci_manager.get_os()
         self.namespace = oci_manager.get_namespace()
@@ -35,12 +35,12 @@ class UploadThread(QThread):
         self.upload_id_manager = UploadId()
         self.upload_id = None
         self.upload_id_manager.test.connect(self.log_id)
-        self.filesizes = filesizes
+        self.filesizes = filesizes.copy()
         self.threadactive = True
         self.setTerminationEnabled()
         self.thread_id = thread_id
-
         self.current_upload = None
+        self.retry_jobs = []
 
     def log_id(self, id):
         """
@@ -53,18 +53,18 @@ class UploadThread(QThread):
         self.upload_id = id
     
     def retry(self):
-        try:
-            self.upload_manager.resume_upload_file(self.namespace, self.bucket_name, self.current_upload["object_name"],\
-                    self.current_upload["file_path"], self.upload_id, progress_callback=self.progress_callback, mixin=self.upload_id_manager, part_size=10485760)
-        except:
-            print("Retry connection failed")
-            self.connection_failed()
-        else:
-            self.file_uploaded.emit(self.current_upload["object_name"], self.current_upload["filesize"])
+        self.upload_manager.resume_upload_file(self.namespace, self.bucket_name, self.current_upload["object_name"],\
+                self.current_upload["file_path"], self.upload_id, progress_callback=self.progress_callback, mixin=self.upload_id_manager, part_size=10485760)
+        # except:
+        #     print("Retry connection failed")
+        #     self.connection_failed()
+        # else:
+        self.file_uploaded.emit(self.current_upload["object_name"], self.current_upload["filesize"])
     
     def connection_failed(self):
         print("Connection failed")
         self.upload_failed.emit()
+        self.retry_jobs.append(self.current_upload)
     
     def connection_canceled(self):
         print("Connection cancelled")
@@ -95,35 +95,61 @@ class UploadThread(QThread):
         :param file: The absolute path of the file
         :type file: string
         """
-        try:
-            response = self.upload_manager.upload_file(self.namespace, self.bucket_name, object_name, file, progress_callback=self.progress_callback, mixin=self.upload_id_manager, part_size=10485760)
-        except:
-            self.connection_failed()
-        else:
-            print(response)
-            return response
+        # try:
+        #     response = self.upload_manager.upload_file(self.namespace, self.bucket_name, object_name, file, progress_callback=self.progress_callback, mixin=self.upload_id_manager, part_size=10485760)
+        # except:
+        #     self.connection_failed()
+        # else:
+        #     print(response)
+        #     return response
+
+        response = self.upload_manager.upload_file(self.namespace, self.bucket_name, object_name, file, progress_callback=self.progress_callback, mixin=self.upload_id_manager, part_size=10485760)
+        return response
     
     def run(self):
         """
 
         """
-        for i, file in enumerate(self.files[0]):
-            if os.path.isfile(file) and self.threadactive:
-                self.current_upload = {"object_name":file.split('/')[-1], "file_path":file, "filesize": " ".join(self.filesizes[i][1])}
-                response = self.upload_file(file, file.split('/')[-1])
-                if response:
-                    self.file_uploaded.emit(file.split('/')[-1], " ".join(self.filesizes[i][1]))
-            elif os.path.isdir(file) and self.threadactive:
-                split_dir = file.split('/')
-                dir_length = len(file) - len(split_dir[-2]) - 1
-                root_dir = True
-                for dir, _, filenames in os.walk(file):
-                    for filename in filenames:
-                        subfile = "{}/{}".format(dir, filename) if not root_dir else "{}{}".format(dir, filename)
-                        print(subfile[dir_length:])
-                        self.current_upload = {"object_name":subfile[dir_length:], "file_path":subfile, "filesize": " ".join(self.filesizes[i][1])}
-                        response = self.upload_file(subfile, subfile[dir_length:])
-                        if response:
-                            self.file_uploaded.emit(file.split('/')[-1], " ".join(self.filesizes[i][1]))
-                    root_dir = False
-        self.all_files_uploaded.emit(self.thread_id)
+
+        while self.files or self.current_upload:
+            if self.current_upload:
+                print("Retrying file upload")
+                self.retry()
+                self.current_upload = None
+            else:
+                filename = self.files.pop()
+                filesize = " ".join(self.filesizes.pop()[1])
+
+                if os.path.isfile(filename) and self.threadactive:
+                    self.current_upload = {"object_name":filename.split('/')[-1], "file_path":filename, "filesize": filesize}
+                    try:
+                        response = self.upload_file(filename, filename.split('/')[-1])
+                    except:
+                        if self.threadactive:
+                            self.connection_failed()
+                        break
+                    if response:
+                        self.file_uploaded.emit(filename.split('/')[-1], filesize)
+                        self.current_upload = None
+                elif os.path.isdir(filename) and self.threadactive:
+                    split_dir = filename.split('/')
+                    dir_length = len(filename) - len(split_dir[-2]) - 1
+                    root_dir = True
+                    for dir, _, filenames in os.walk(filename):
+                        for filename in filenames:
+                            subfile = "{}/{}".format(dir, filename) if not root_dir else "{}{}".format(dir, filename)
+                            print(subfile[dir_length:])
+                            self.current_upload = {"object_name":subfile[dir_length:], "file_path":subfile, "filesize": filesize}
+                            try:
+                                response = self.upload_file(subfile, subfile[dir_length:])
+                            except:
+                                if self.threadactive:
+                                    self.connection_failed()
+                                break
+                            if response:
+                                self.file_uploaded.emit(filename.split('/')[-1], filesize)
+                                self.current_upload = None
+                        root_dir = False
+                        
+        if not self.files or not self.current_upload:
+            self.all_files_uploaded.emit(self.thread_id)

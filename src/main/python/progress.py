@@ -78,6 +78,7 @@ class ProgressWindow(QWidget):
         self.calc.start()
 
     def next_file(self, *args):
+        # print(self.files[0])
         self.retry_label.setVisible(False)
         self.retry.setEnabled(False)
         if self.files_uploaded < self.files_len:
@@ -86,10 +87,10 @@ class ProgressWindow(QWidget):
             if self.files_uploaded < self.files_len:
                 self.count = 0
                 self.progress.setValue(0)
-                self.file_label.setText("Uploading {}".format(self.files[0][self.files_uploaded].split('/')[-1]))
-                self.size_label.setText(" ".join(self.filesizes[self.files_uploaded][1]))
-                self.divider = 1024**byte_type[self.filesizes[self.files_uploaded][1][1]]
-                self.max = round(self.filesizes[self.files_uploaded][0]/self.divider)
+                self.file_label.setText("Uploading {}".format(self.files[0][(self.files_len - 1) - self.files_uploaded].split('/')[-1]))
+                self.size_label.setText(" ".join(self.filesizes[(self.files_len - 1) - self.files_uploaded][1]))
+                self.divider = 1024**byte_type[self.filesizes[(self.files_len - 1) - self.files_uploaded][1][1]]
+                self.max = round(self.filesizes[(self.files_len - 1) - self.files_uploaded][0]/self.divider)
                 self.progress.setMaximum(self.max)
                 
             else:
@@ -114,10 +115,6 @@ class ProgressWindow(QWidget):
     
     def retry_handler(self):
         print("Retry handler")
-        # self.retry_label = QLabel()
-        # self.retry_label.setText("Connection failed")
-        # self.retry_label.setStyleSheet("QLabel {color: red; }")
-        # self.layout.addWidget(self.retry_label)
         self.retry_label.setVisible(True)
         self.retry.setEnabled(True)
 

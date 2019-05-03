@@ -104,6 +104,8 @@ class CentralWidget(QWidget):
 
         self.bucket_tree = self.get_placeholder_tree('Buckets', 'No compartment selected')
         self.obj_tree = self.get_placeholder_tree('Objects', 'No bucket selected')
+        self.obj_tree.setHeaderLabels(['Objects', 'Size'])
+        self.obj_tree.resizeColumnToContents(0)
 
         self.bucket_tree.itemClicked.connect(self.select_bucket)
 
@@ -254,7 +256,7 @@ class CentralWidget(QWidget):
         upload_thread.all_files_uploaded.connect(self.all_files_uploaded)
         upload_thread.upload_failed.connect(progress_thread.retry_handler)
         progress_thread.cancel_signal.connect(self.file_upload_canceled)
-        progress_thread.retry.clicked.connect(upload_thread.retry)
+        progress_thread.retry.clicked.connect(upload_thread.start)
 
         self.progress_threads[c] = progress_thread
         self.upload_threads[c] = upload_thread
