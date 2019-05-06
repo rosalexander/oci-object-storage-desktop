@@ -229,8 +229,14 @@ class CentralWidget(QWidget):
         else:
             print("Must choose a bucket")        
 
-    def download_files(self, objects, bucket_name):
+    def download_files(self, objects, filesizes, bucket_name):
+        self.progress_thread = ProgressWindow((objects, 'All files'), filesizes, self.progress_thread_count, download=True)
         self.download_thread = DownloadThread(objects, bucket_name, self.oci_manager, self.progress_thread_count)
+        
+        self.download_thread.file_downloaded.connect(self.progress_thread.next_file)
+        self.download_thread.bytes_downloaded.connect(self.progress_thread.set_progress)
+        self.progress_thread.cancel_signal.connect(self.download_thread.stop)
+        self.progress_thread.show()
         self.download_thread.start()
 
 
@@ -534,6 +540,7 @@ class CentralWidget(QWidget):
                     byte_type_pointer += 1
                 byte_size = round(byte_size, 2)
                 obj_tree_item.setText(1, "{} {}".format(str(byte_size), byte_type[byte_type_pointer]))
+                obj_tree_item.setText(2, str(obj.size))
         else:
             tree_item = QTreeWidgetItem(self.obj_tree)
             tree_item.setText(0, "No bucket selected")
@@ -635,7 +642,8 @@ class Tree(QTreeWidget):
     
     def download_objects(self):
         objects = [item.text(0) for item in self.selectedItems()]
-        self.parentWidget().download_files(objects, self.bucket_name)
+        filesizes = [(int(item.text(2)), item.text(1).split(" ")) for item in self.selectedItems()]
+        self.parentWidget().download_files(objects, filesizes, self.bucket_name)
 
     
     def delete_objects(self):

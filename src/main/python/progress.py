@@ -11,7 +11,7 @@ class ProgressWindow(QDialog):
 
     cancel_signal = Signal(int)
     
-    def __init__(self, files, filesizes, thread_id):
+    def __init__(self, files, filesizes, thread_id, download=False):
         super().__init__()
         print(len(files[0]), len(filesizes))
         print(files[0])
@@ -22,10 +22,18 @@ class ProgressWindow(QDialog):
         self.filesizes = filesizes
         self.divider = 1024**byte_type[self.filesizes[self.files_uploaded][1][1]]
         self.max = round(self.filesizes[self.files_uploaded][0]/self.divider)
+        self.download = download
         print(self.max)
-        self.setWindowTitle('Uploading Files ({}/{})'.format(self.files_uploaded, len(files[0])))
+        
         self.file_label = QLabel()
-        self.file_label.setText("Uploading {}".format(files[0][self.files_len - 1].split('/')[-1]))
+
+        if self.download:
+            self.setWindowTitle('Downloading Files ({}/{})'.format(self.files_uploaded, len(files[0])))
+            self.file_label.setText("Downloading {}".format(files[0][self.files_len - 1].split('/')[-1]))
+        else:
+            self.setWindowTitle('Uploading Files ({}/{})'.format(self.files_uploaded, len(files[0])))
+            self.file_label.setText("Uploading {}".format(files[0][self.files_len - 1].split('/')[-1]))
+
         self.size_label = QLabel(" ".join(filesizes[self.files_uploaded][1]))
         self.size_label.setAlignment(Qt.AlignRight)
         print(" ".join(filesizes[self.files_uploaded][1]))
@@ -81,26 +89,36 @@ class ProgressWindow(QDialog):
         self.retry.setEnabled(False)
         if self.files_uploaded < self.files_len:
             self.files_uploaded += 1
-            self.setWindowTitle("Uploading Files ({}/{})".format(self.files_uploaded, self.files_len))
+
+            if self.download:
+                self.setWindowTitle("Downloading Files ({}/{})".format(self.files_uploaded, self.files_len))
+            else:
+                self.setWindowTitle("Uploading Files ({}/{})".format(self.files_uploaded, self.files_len))
             if self.files_uploaded < self.files_len:
                 self.count = 0
                 self.progress.setValue(0)
-                self.file_label.setText("Uploading {}".format(self.files[0][(self.files_len - 1) - self.files_uploaded].split('/')[-1]))
+                if self.download:
+                    self.file_label.setText("Downloading {}".format(self.files[0][(self.files_len - 1) - self.files_uploaded].split('/')[-1]))
+                else:
+                    self.file_label.setText("Uploading {}".format(self.files[0][(self.files_len - 1) - self.files_uploaded].split('/')[-1]))
                 self.size_label.setText(" ".join(self.filesizes[(self.files_len - 1) - self.files_uploaded][1]))
                 self.divider = 1024**byte_type[self.filesizes[(self.files_len - 1) - self.files_uploaded][1][1]]
                 self.max = round(self.filesizes[(self.files_len - 1) - self.files_uploaded][0]/self.divider)
                 self.progress.setMaximum(self.max)
                 
             else:
-                self.file_label.setText("All uploads complete")
+                if self.download:
+                    self.file_label.setText("All downloads complete")
+                else:
+                    self.file_label.setText("All uploads complete")
                 self.size_label.setText("")
                 self.progress.setValue(self.max)
                 self.ok.setEnabled(True)
                 self.cancel.setEnabled(False)
     
     def set_progress(self, count):
-        print("{} bytes uploaded".format(count))
-        self.count += round(count/self.divider)
+        # print("{} bytes uploaded".format(count))
+        self.count += (count/self.divider)
         self.progress.setValue(self.count)
     
     def connection_failed(self):

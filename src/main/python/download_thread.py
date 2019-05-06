@@ -27,7 +27,7 @@ class DownloadThread(QThread):
         :type: :class: 'oci_manager.oci_manager'
         """
         super().__init__()
-        self.objects = objects
+        self.objects = objects.copy()
         self.bucket_name = bucket_name
         self.os_client = oci_manager.get_os()
         self.namespace = oci_manager.get_namespace()
@@ -57,6 +57,8 @@ class DownloadThread(QThread):
     def stop(self):
         print("Connection stopped")
         self.threadactive = False
+        # self.f.flush()
+        # self.f.close()
         self.wait()
     
     def download_file(self, filename, response):
@@ -92,11 +94,38 @@ class DownloadThread(QThread):
 
         with open(path, "wb+") as f:
             for chunk in response.data:
-                bits += f.write(chunk)
-                print("{}/{}".format(bits, response.headers['Content-Length']))
-                self.progress_callback(bits)
+                if self.threadactive:
+                    bits = f.write(chunk)
+                    # print("{}/{}".format(bits, response.headers['Content-Length']))
+                    self.progress_callback(bits)
+                else:
+                    break
 
         return True
+    
+    def get_path(self, filename):
+        duplicate = 0
+        dup_modifier = ''
+        name_split = filename.split(".")
+        dup_path = self.path
+
+        if len(name_split) > 1:
+            for i, part in enumerate(name_split):
+                if i < len(name_split) - 1:
+                    dup_path += part
+                if i < len(name_split) - 2:
+                    dup_path += '.'
+            name_split[-1] = '.' + name_split[-1]
+        else:
+            dup_path += name_split.pop()
+            name_split.append('')
+        
+        while os.path.exists(dup_path + dup_modifier + name_split[-1]):
+            duplicate += 1
+            dup_modifier = ' ({})'.format(duplicate)
+        
+        path = dup_path + dup_modifier + name_split[-1]
+        return path
     
     def run(self):
         """
@@ -110,15 +139,29 @@ class DownloadThread(QThread):
                 object_size = response.headers['Content-Length']
 
                 self.current_download = {"object_name":object_name, "file_path":self.path + object_name, "object_size": object_size}
+
                 try:
-                    download_resp = self.download_file(object_name, response)
+                    path = self.get_path(object_name)
+                    # download_resp = self.download_file(object_name, response)
+                        
+                    self.f = open(path + ".tmp","wb+")
+                    for chunk in response.data:
+                        if self.threadactive:
+                            bits = self.f.write(chunk)
+                            self.progress_callback(bits)
+                        else:
+                            break
+                    self.f.close()
+                    if self.threadactive:
+                        os.rename(path + ".tmp", path)
+                        self.threadactive = False
                 except:
                     if self.threadactive:
                         self.connection_failed()
                     break
-                if download_resp:
-                    self.file_downloaded.emit(object_name, object_size)
-                    self.current_download = None
+    
+                self.file_downloaded.emit(object_name, object_size)
+                self.current_download = None
 
         if not self.objects and not self.current_download:
             self.all_files_downloaded.emit(self.thread_id)
