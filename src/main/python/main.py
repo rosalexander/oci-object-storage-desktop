@@ -7,6 +7,7 @@ from config import ConfigWindow
 from progress import ProgressWindow
 from util import get_filesize
 from upload_thread import UploadThread
+from download_thread import DownloadThread
 import sys
 import os
 
@@ -227,6 +228,11 @@ class CentralWidget(QWidget):
                 self.select_bucket(bucket)
         else:
             print("Must choose a bucket")        
+
+    def download_files(self, objects, bucket_name):
+        self.download_thread = DownloadThread(objects, bucket_name, self.oci_manager, self.progress_thread_count)
+        self.download_thread.start()
+
 
     
     def upload_files(self, files, bucket_name):
@@ -617,14 +623,20 @@ class Tree(QTreeWidget):
         """
         Context menu when the object tree is right clicked
         """
-        if self.accept_drop and elf.selectedItems():
+        if self.accept_drop and self.selectedItems():
             menu = QMenu(self)
             copy_action = menu.addAction("Copy")
             download_action = menu.addAction("Download")
             rename_action = menu.addAction("Rename")
             delete_action = menu.addAction("Delete")
             delete_action.triggered.connect(self.delete_objects)
+            download_action.triggered.connect(self.download_objects)
             menu.exec_(QCursor.pos())
+    
+    def download_objects(self):
+        objects = [item.text(0) for item in self.selectedItems()]
+        self.parentWidget().download_files(objects, self.bucket_name)
+
     
     def delete_objects(self):
         items = self.selectedItems()
