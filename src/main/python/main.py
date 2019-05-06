@@ -29,6 +29,7 @@ class AppContext(ApplicationContext):
     def config(self):
         return ConfigWindow('DEFAULT')
 
+
 class MainWindow(QMainWindow):
     def __init__(self, main_menu, central_widget, config_window):
         """
@@ -56,6 +57,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.central_widget)
         self.setWindowTitle(self.central_widget.windowTitle())
         self.setMenuBar(self.menubar)
+
     
     
     def change_profile(self, new_profile):
@@ -264,7 +266,7 @@ class CentralWidget(QWidget):
         self.progress_threads[c].show()
         self.upload_threads[c].start()
 
-    def file_uploaded(self, filename, filesize):
+    def file_uploaded(self, filename, filesize, bucket_name):
         """
         When a file is uploaded then we add the filename and the filesize to the object tree view
 
@@ -276,9 +278,12 @@ class CentralWidget(QWidget):
         TODO: Fix bug where changing the tree during mid upload will add text to that tree.
         """
         print(filename, filesize, "Uploaded")
-        obj_tree_item = QTreeWidgetItem(self.obj_tree)
-        obj_tree_item.setText(0, filename)
-        obj_tree_item.setText(1, filesize)
+        items = [item.text(0) for item in self.bucket_tree.selectedItems()]
+
+        if items and items[0] == bucket_name:
+            obj_tree_item = QTreeWidgetItem(self.obj_tree)
+            obj_tree_item.setText(0, filename)
+            obj_tree_item.setText(1, filesize)
     
     def all_files_uploaded(self, thread_id):
         """
@@ -287,6 +292,7 @@ class CentralWidget(QWidget):
         :param thread_id: The id given to the thread upon creation
         :type thread_id: int
         """
+        print("All files uploaded. Deleting upload thread")
         if thread_id in self.upload_threads:
             del self.upload_threads[thread_id]
     
@@ -298,6 +304,7 @@ class CentralWidget(QWidget):
         :param thread_id: The id given to the threads upon creation
         :type thread_id: int
         """
+
         self.upload_threads[thread_id].stop()
         if thread_id in self.upload_threads:
             del self.upload_threads[thread_id]
@@ -610,12 +617,12 @@ class Tree(QTreeWidget):
         """
         Context menu when the object tree is right clicked
         """
-        if self.accept_drop:
+        if self.accept_drop and elf.selectedItems():
             menu = QMenu(self)
-            upload_action = menu.addAction("Upload file(s)")
-            delete_action = menu.addAction("Delete file(s)")
-            if not self.selectedItems():
-                delete_action.setEnabled(False)
+            copy_action = menu.addAction("Copy")
+            download_action = menu.addAction("Download")
+            rename_action = menu.addAction("Rename")
+            delete_action = menu.addAction("Delete")
             delete_action.triggered.connect(self.delete_objects)
             menu.exec_(QCursor.pos())
     

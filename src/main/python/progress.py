@@ -7,7 +7,7 @@ from PySide2.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxL
 
 byte_type = {'KB':0, 'MB':1, 'GB':2, 'TB':3, 'PB':4}
 
-class ProgressWindow(QWidget):
+class ProgressWindow(QDialog):
 
     cancel_signal = Signal(int)
     
@@ -25,7 +25,7 @@ class ProgressWindow(QWidget):
         print(self.max)
         self.setWindowTitle('Uploading Files ({}/{})'.format(self.files_uploaded, len(files[0])))
         self.file_label = QLabel()
-        self.file_label.setText("Uploading {}".format(files[0][self.files_uploaded].split('/')[-1]))
+        self.file_label.setText("Uploading {}".format(files[0][self.files_len - 1].split('/')[-1]))
         self.size_label = QLabel(" ".join(filesizes[self.files_uploaded][1]))
         self.size_label.setAlignment(Qt.AlignRight)
         print(" ".join(filesizes[self.files_uploaded][1]))
@@ -61,7 +61,6 @@ class ProgressWindow(QWidget):
         self.layout.addWidget(self.size_label)
         self.layout.addWidget(self.button_box)
 
-
         self.retry_label = QLabel()
         self.retry_label.setText("Connection failed")
         self.retry_label.setStyleSheet("QLabel {color: red; }")
@@ -69,7 +68,6 @@ class ProgressWindow(QWidget):
         self.retry_label.setVisible(False)
 
         self.setLayout(self.layout)
-
         self.thread_id = thread_id
     
     def test(self):
@@ -118,9 +116,6 @@ class ProgressWindow(QWidget):
         self.retry_label.setVisible(True)
         self.retry.setEnabled(True)
 
-    
-
-
 class TestProgress(QThread):
 
     countChanged = Signal(int)
@@ -137,7 +132,7 @@ class TestProgress(QThread):
 
 if __name__ == '__main__':
     app = QApplication([])
-    window = ProgressWindow((['test1.txt', 'test2.txt', 'test3.txt'], 'All files'), [(6804103168, ['6.34', 'GB']), (10, ['2', 'KB']), (10, ['3', 'KB'])])
+    window = ProgressWindow((['test1.txt', 'test2.txt', 'test3.txt'], 'All files'), [(6804103168, ['6.34', 'GB']), (10, ['2', 'KB']), (10, ['3', 'KB'])], 0)
     # time.sleep(10)
     print(window.minimumSizeHint())
     window.resize(192, 146)
