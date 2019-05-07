@@ -145,7 +145,7 @@ class DownloadThread(QThread):
                     # download_resp = self.download_file(object_name, response)
                         
                     self.f = open(path + ".tmp","wb+")
-                    for chunk in response.data:
+                    for chunk in response.data.iter_content(chunk_size=8192):
                         if self.threadactive:
                             bits = self.f.write(chunk)
                             self.progress_callback(bits)
