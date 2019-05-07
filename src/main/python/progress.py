@@ -2,7 +2,7 @@ import sys
 import os
 import configparser
 import time
-from PySide2.QtCore import Qt, Signal, QThread, QItemSelectionModel
+from PySide2.QtCore import Qt, Signal, QThread
 from PySide2.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QDialogButtonBox, QDialog, QProgressBar, QLabel, QSizePolicy
 
 byte_type = {'KB':0, 'MB':1, 'GB':2, 'TB':3, 'PB':4}

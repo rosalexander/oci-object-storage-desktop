@@ -5,6 +5,7 @@ from oci_manager import oci_manager, UploadId
 from config import ConfigWindow
 from progress import ProgressWindow
 from util import get_filesize
+from mimetypes import guess_type
 import sys
 import os
 
@@ -55,10 +56,6 @@ class UploadThread(QThread):
     def retry(self):
         self.upload_manager.resume_upload_file(self.namespace, self.bucket_name, self.current_upload["object_name"],\
                 self.current_upload["file_path"], self.upload_id, progress_callback=self.progress_callback, mixin=self.upload_id_manager, part_size=10485760)
-        # except:
-        #     print("Retry connection failed")
-        #     self.connection_failed()
-        # else:
         self.file_uploaded.emit(self.current_upload["object_name"], self.current_upload["filesize"], self.bucket_name)
     
     def connection_failed(self):

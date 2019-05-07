@@ -1,7 +1,7 @@
 from fbs_runtime.application_context import ApplicationContext, cached_property
-from PySide2.QtCore import Qt, Signal, QObject, QTextCodec, QThread
+from PySide2.QtCore import Qt, Signal
 from PySide2.QtGui import QColor, QCursor
-from PySide2.QtWidgets import QWidget, QMainWindow, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QTreeWidget, QTreeWidgetItem, QDialogButtonBox, QDialog, QLineEdit, QAbstractItemView, QMenuBar, QMenu, QAction, QProgressBar
+from PySide2.QtWidgets import QWidget, QMainWindow, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QTreeWidget, QTreeWidgetItem, QDialogButtonBox, QDialog, QLineEdit, QAbstractItemView, QMenuBar, QMenu, QAction
 from oci_manager import oci_manager, UploadId
 from config import ConfigWindow
 from progress import ProgressWindow
@@ -230,14 +230,24 @@ class CentralWidget(QWidget):
             print("Must choose a bucket")        
 
     def download_files(self, objects, filesizes, bucket_name):
-        self.progress_thread = ProgressWindow((objects, 'All files'), filesizes, self.progress_thread_count, download=True)
-        self.download_thread = DownloadThread(objects, bucket_name, self.oci_manager, self.progress_thread_count)
+
+        c = self.progress_thread_count
+        self.progress_thread_count += 1
+        self.upload_thread_count += 1
+
+        progress_thread = ProgressWindow((objects, 'All files'), filesizes, c, download=True)
+        download_thread = DownloadThread(objects, bucket_name, self.oci_manager, c)
         
-        self.download_thread.file_downloaded.connect(self.progress_thread.next_file)
-        self.download_thread.bytes_downloaded.connect(self.progress_thread.set_progress)
-        self.progress_thread.cancel_signal.connect(self.download_thread.stop)
-        self.progress_thread.show()
-        self.download_thread.start()
+        download_thread.file_downloaded.connect(progress_thread.next_file)
+        download_thread.bytes_downloaded.connect(progress_thread.set_progress)
+        download_thread.all_files_downloaded.connect(self.delete_threads)
+        progress_thread.cancel_signal.connect(self.thread_cancelled)
+
+        self.progress_threads[c] = progress_thread
+        self.upload_threads[c] = download_thread
+
+        self.progress_threads[c].show()
+        self.upload_threads[c].start()
 
 
     
@@ -250,7 +260,7 @@ class CentralWidget(QWidget):
         :param bucket_name: The name of bucket to upload file(s) to in OCI
         :type bucket_name: string
 
-        TODO: Implement cancelling upload jobs, pausing upload jobs, and resuming upload jobs. Progress window is bigger than it should be, but functional
+        TODO: Progress window is bigger than it should be, but functional
         """
         
         filesizes = []
@@ -267,9 +277,9 @@ class CentralWidget(QWidget):
         upload_thread.file_uploaded.connect(progress_thread.next_file)
         upload_thread.file_uploaded.connect(self.file_uploaded)
         upload_thread.bytes_uploaded.connect(progress_thread.set_progress)
-        upload_thread.all_files_uploaded.connect(self.all_files_uploaded)
+        upload_thread.all_files_uploaded.connect(self.delete_threads)
         upload_thread.upload_failed.connect(progress_thread.retry_handler)
-        progress_thread.cancel_signal.connect(self.file_upload_canceled)
+        progress_thread.cancel_signal.connect(self.thread_cancelled)
         progress_thread.retry.clicked.connect(upload_thread.start)
 
         self.progress_threads[c] = progress_thread
@@ -287,7 +297,6 @@ class CentralWidget(QWidget):
         :param filesize: The filesize in format of numeric then abbreviated units e.g '128 KB'
         :type filesize: string
 
-        TODO: Fix bug where changing the tree during mid upload will add text to that tree.
         """
         print(filename, filesize, "Uploaded")
         items = [item.text(0) for item in self.bucket_tree.selectedItems()]
@@ -297,7 +306,7 @@ class CentralWidget(QWidget):
             obj_tree_item.setText(0, filename)
             obj_tree_item.setText(1, filesize)
     
-    def all_files_uploaded(self, thread_id):
+    def delete_threads(self, thread_id):
         """
         Deletes the upload thread from the dictionary of upload threads when it completes
 
@@ -309,7 +318,7 @@ class CentralWidget(QWidget):
             del self.upload_threads[thread_id]
     
     
-    def file_upload_canceled(self, thread_id):
+    def thread_cancelled(self, thread_id):
         """
         Deletes the upload thread and progress window threads from their respective dictionaries when the job is cancelled
 

@@ -1,6 +1,4 @@
-from PySide2.QtCore import Qt, Signal, QObject, QTextCodec, QThread
-from PySide2.QtGui import QColor, QCursor
-from PySide2.QtWidgets import QWidget, QMainWindow, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QTreeWidget, QTreeWidgetItem, QDialogButtonBox, QDialog, QLineEdit, QAbstractItemView, QMenuBar, QMenu, QAction, QProgressBar
+from PySide2.QtCore import Qt, Signal, QThread
 from oci_manager import oci_manager
 from config import ConfigWindow
 from progress import ProgressWindow
@@ -57,8 +55,6 @@ class DownloadThread(QThread):
     def stop(self):
         print("Connection stopped")
         self.threadactive = False
-        # self.f.flush()
-        # self.f.close()
         self.wait()
     
     def download_file(self, filename, response):
@@ -133,9 +129,13 @@ class DownloadThread(QThread):
         """
 
         while self.objects or self.current_download:
+            print(self.objects, "test")
             object_name = self.objects.pop()
             response = self.os_client.get_object(self.namespace, self.bucket_name, object_name)
+            print("test2")
+            print(response.status, response.data, self.threadactive)
             if response.status == 200 and self.threadactive:
+                print("test3")
                 object_size = response.headers['Content-Length']
 
                 self.current_download = {"object_name":object_name, "file_path":self.path + object_name, "object_size": object_size}
@@ -154,7 +154,6 @@ class DownloadThread(QThread):
                     self.f.close()
                     if self.threadactive:
                         os.rename(path + ".tmp", path)
-                        self.threadactive = False
                 except:
                     if self.threadactive:
                         self.connection_failed()

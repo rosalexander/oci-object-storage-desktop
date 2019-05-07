@@ -1,8 +1,8 @@
 import sys
 import os
 import configparser
-from PySide2.QtCore import Qt, SIGNAL, QObject, QTextCodec
-from PySide2.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QTreeWidget, QTreeWidgetItem, QDialogButtonBox, QDialog, QLineEdit, QAbstractItemView, QMenuBar, QMenu, QAction, QComboBox
+from PySide2.QtCore import Qt, SIGNAL, QObject
+from PySide2.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QDialogButtonBox, QDialog, QLineEdit, QComboBox
 
 
 # DEFAULT_LOCATION = os.path.expanduser(os.path.join('~', '.oci', 'config'))
