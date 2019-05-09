@@ -70,7 +70,7 @@ class Tree(QTreeWidget):
     
     def download_objects(self):
         objects = [item.text(0) for item in self.selectedItems()]
-        filesizes = [(int(item.text(2)), item.text(1).split(" ")) for item in self.selectedItems()]
+        filesizes = [(int(item.text(2)), item.text(1).split(" ")) for item in self.selectedItems() if item.text(2)]
         self.parentWidget().download_files(objects, filesizes, self.bucket_name)
 
     
@@ -127,17 +127,6 @@ class Tree(QTreeWidget):
 
             self.parentWidget().upload_files((files, "All files"), self.bucket_name)
     
-    def file_uploaded(self, filename, filesize):
-        """
-        TODO: Return some information when a file upload job completes
-        """
-        print(filename, filesize, "Uploaded")
-        obj_tree_item = TreeWidgetItem(self)
-        obj_tree_item.setText(0, filename)
-        obj_tree_item.setText(1, filesize)
-
-        return None
-    
     def toggle(self):
         if self.isVisible():
             self.hide()
@@ -164,5 +153,5 @@ class TreeWidgetItem(QTreeWidgetItem):
                 if byte_type[key1[-2:]] != byte_type[key2[-2:]]:
                     return byte_type[key1[-2:]] < byte_type[key2[-2:]]
             return float(key1[0:-3]) < float(key2[0:-3])
-        except ValueError:
+        except:
             return key1 < key2

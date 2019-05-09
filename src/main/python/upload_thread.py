@@ -11,7 +11,7 @@ import os
 
 class UploadThread(QThread):
 
-    file_uploaded = Signal(str, str, str)
+    file_uploaded = Signal(str, str, str, int)
     bytes_uploaded = Signal(int)
     all_files_uploaded = Signal(int)
     upload_failed = Signal()
@@ -56,7 +56,7 @@ class UploadThread(QThread):
     def retry(self):
         self.upload_manager.resume_upload_file(self.namespace, self.bucket_name, self.current_upload["object_name"],\
                 self.current_upload["file_path"], self.upload_id, progress_callback=self.progress_callback, mixin=self.upload_id_manager, part_size=10485760)
-        self.file_uploaded.emit(self.current_upload["object_name"], self.current_upload["filesize"], self.bucket_name)
+        self.file_uploaded.emit(self.current_upload["object_name"], self.current_upload["filesize"], self.bucket_name, self.current_upload["filesize_bits"])
     
     def connection_failed(self):
         print("Connection failed")
@@ -104,10 +104,11 @@ class UploadThread(QThread):
                 self.current_upload = None
             else:
                 filename = self.files.pop()
-                filesize = " ".join(self.filesizes.pop()[1])
+                filesize_bits = self.filesizes.pop()
+                filesize = " ".join(filesize_bits[1])
 
                 if os.path.isfile(filename) and self.threadactive:
-                    self.current_upload = {"object_name":filename.split('/')[-1], "file_path":filename, "filesize": filesize}
+                    self.current_upload = {"object_name":filename.split('/')[-1], "file_path":filename, "filesize": filesize, "filesize_bits": filesize_bits[0]}
                     try:
                         response = self.upload_file(filename, filename.split('/')[-1])
                     except:
@@ -115,7 +116,7 @@ class UploadThread(QThread):
                             self.connection_failed()
                         break
                     if response:
-                        self.file_uploaded.emit(filename.split('/')[-1], filesize, self.bucket_name)
+                        self.file_uploaded.emit(filename.split('/')[-1], filesize, self.bucket_name, filesize_bits[0])
                         self.current_upload = None
                 elif os.path.isdir(filename) and self.threadactive:
                     split_dir = filename.split('/')
@@ -133,7 +134,7 @@ class UploadThread(QThread):
                                     self.connection_failed()
                                 break
                             if response:
-                                self.file_uploaded.emit(filename.split('/')[-1], filesize, self.bucket_name)
+                                self.file_uploaded.emit(filename.split('/')[-1], filesize, self.bucket_name, filesize_bits[0])
                                 self.current_upload = None
                         root_dir = False
 

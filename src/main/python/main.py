@@ -291,7 +291,7 @@ class CentralWidget(QWidget):
         self.progress_threads[c].show()
         self.upload_threads[c].start()
 
-    def file_uploaded(self, filename, filesize, bucket_name):
+    def file_uploaded(self, filename, filesize, bucket_name, filesize_bits):
         """
         When a file is uploaded then we add the filename and the filesize to the object tree view
 
@@ -308,6 +308,7 @@ class CentralWidget(QWidget):
             obj_tree_item = TreeWidgetItem(self.obj_tree)
             obj_tree_item.setText(0, filename)
             obj_tree_item.setText(1, filesize)
+            obj_tree_item.setText(2, str(filesize_bits))
     
     def delete_threads(self, thread_id):
         """
