@@ -1,7 +1,7 @@
 import oci
 import os
 import sys
-from PySide2.QtCore import Qt, Signal, QThread, QObject
+from PySide2.QtCore import Qt, Signal, QObject
 
 MEBIBYTE = 1024 * 1024
 STREAMING_DEFAULT_PART_SIZE = 10 * MEBIBYTE
@@ -105,6 +105,12 @@ class oci_manager():
     def delete_object(self, bucket_name, object_name):
         response = self.get_os().delete_object(self.get_namespace(), bucket_name, object_name)
         return response
+    
+    def rename_object(self, bucket_name, source_name, new_name):
+        details = oci.object_storage.models.RenameObjectDetails(source_name=source_name, new_name=new_name)
+        response = self.get_os().rename_object(self.get_namespace(), bucket_name, details)
+        return response
+        
 
 class UploadId(QObject):
     test = Signal(str)
@@ -241,7 +247,7 @@ class UploadManager(oci.object_storage.UploadManager):
                 #     print("Connection failure. Retry with Upload ID {}".format(ma.manifest['uploadId']))
                 # else:
                 #     return response
-                
+
                 ma.upload(**upload_kwargs)
                 response = ma.commit()
                 return response

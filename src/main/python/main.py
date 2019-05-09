@@ -1,13 +1,15 @@
 from fbs_runtime.application_context import ApplicationContext, cached_property
 from PySide2.QtCore import Qt, Signal
 from PySide2.QtGui import QColor, QCursor
-from PySide2.QtWidgets import QWidget, QMainWindow, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QTreeWidget, QTreeWidgetItem, QDialogButtonBox, QDialog, QLineEdit, QAbstractItemView, QMenuBar, QMenu, QAction
+from PySide2.QtWidgets import QWidget, QMainWindow, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QTreeWidget, QTreeWidgetItem, QDialogButtonBox, QDialog, QLineEdit, QAbstractItemView, QMenuBar, QMenu, QAction, QDialog, QMessageBox, QInputDialog
 from oci_manager import oci_manager, UploadId
 from config import ConfigWindow
 from progress import ProgressWindow
 from util import get_filesize
 from upload_thread import UploadThread
 from download_thread import DownloadThread
+from rename import RenameWindow
+from tree import Tree, TreeWidgetItem
 import sys
 import os
 
@@ -54,6 +56,7 @@ class MainWindow(QMainWindow):
         self.menubar.compartment_view.triggered.connect(self.central_widget.compartment_tree.toggle)
         self.menubar.bucket_view.triggered.connect(self.central_widget.bucket_tree.toggle)
         self.menubar.object_view.triggered.connect(self.central_widget.obj_tree.toggle)
+        self.menubar.upload_action.triggered.connect(self.central_widget.select_files)
 
         self.setCentralWidget(self.central_widget)
         self.setWindowTitle(self.central_widget.windowTitle())
@@ -302,7 +305,7 @@ class CentralWidget(QWidget):
         items = [item.text(0) for item in self.bucket_tree.selectedItems()]
 
         if items and items[0] == bucket_name:
-            obj_tree_item = QTreeWidgetItem(self.obj_tree)
+            obj_tree_item = TreeWidgetItem(self.obj_tree)
             obj_tree_item.setText(0, filename)
             obj_tree_item.setText(1, filesize)
     
@@ -363,7 +366,7 @@ class CentralWidget(QWidget):
 
         tree_widget = Tree()
         tree_widget.setHeaderLabels(['Compartments', 'OCID'])
-        tree_dic[root] = QTreeWidgetItem(tree_widget)
+        tree_dic[root] = TreeWidgetItem(tree_widget)
         tree_dic[root].setText(0, '(root)')
         tree_dic[root].setText(1, root)
 
@@ -372,7 +375,7 @@ class CentralWidget(QWidget):
             compartment_id = stack.pop()
             parent_tree = tree_dic[compartment_id]
             for child_id in hierarchy[compartment_id]:
-                child_tree = QTreeWidgetItem(parent_tree)
+                child_tree = TreeWidgetItem(parent_tree)
                 child_tree.setText(0, compartment_dic[child_id].name)
                 child_tree.setText(1, child_id)
                 tree_dic[child_id] = child_tree
@@ -418,18 +421,18 @@ class CentralWidget(QWidget):
             data = self.oci_manager.get_os().list_buckets(namespace, ocid).data
         except:
             print("You do not have authorization to perform this request, or the requested resource could not be found")
-            bucket_tree = QTreeWidgetItem(tree_widget)
+            bucket_tree = TreeWidgetItem(tree_widget)
             bucket_tree.setText(0, 'You do not have authorization to perform this request, or the requested resource could not be found')
             bucket_tree.setTextColor(0, QColor(220,220,220))
         finally:
             if not data:
-                bucket_tree = QTreeWidgetItem(tree_widget)
+                bucket_tree = TreeWidgetItem(tree_widget)
                 bucket_tree.setText(0, 'Compartment contains no buckets')
                 bucket_tree.setTextColor(0, QColor(220,220,220))
             else:
                 for bucket in data:
                     print(bucket.name)
-                    bucket_tree = QTreeWidgetItem(tree_widget)
+                    bucket_tree = TreeWidgetItem(tree_widget)
                     bucket_tree.setText(0, bucket.name)
                 tree_widget.itemClicked.connect(self.select_bucket)
 
@@ -452,20 +455,20 @@ class CentralWidget(QWidget):
             data = self.oci_manager.get_os().list_buckets(namespace, ocid).data
         except:
             print("You do not have authorization to perform this request, or the requested resource could not be found")
-            bucket_tree_item = QTreeWidgetItem(self.bucket_tree)
+            bucket_tree_item = TreeWidgetItem(self.bucket_tree)
             bucket_tree_item.setText(0, 'You do not have authorization to perform this request, or the requested resource could not be found')
             bucket_tree_item.setTextColor(0, QColor(220,220,220))
             bucket_tree_item.setDisabled(True)
         finally:
             if not data:
-                bucket_tree_item = QTreeWidgetItem(self.bucket_tree)
+                bucket_tree_item = TreeWidgetItem(self.bucket_tree)
                 bucket_tree_item.setText(0, 'Compartment contains no buckets')
                 bucket_tree_item.setTextColor(0, QColor(220,220,220))
                 bucket_tree_item.setDisabled(True)
             else:
                 for bucket in data:
                     print(bucket.name)
-                    bucket_tree_item = QTreeWidgetItem(self.bucket_tree)
+                    bucket_tree_item = TreeWidgetItem(self.bucket_tree)
                     bucket_tree_item.setText(0, bucket.name)
                 # self.bucket_tree.itemClicked.connect(self.select_bucket)
     
@@ -504,7 +507,7 @@ class CentralWidget(QWidget):
 
         for obj in data:
             print(obj.name)
-            obj_tree_item = QTreeWidgetItem(tree_widget)
+            obj_tree_item = TreeWidgetItem(tree_widget)
             obj_tree_item.setText(0, obj.name)
             byte_type_pointer = 0
             byte_size = obj.size/1024.0
@@ -540,7 +543,7 @@ class CentralWidget(QWidget):
             data = self.oci_manager.get_os().list_objects(namespace, bucket_name, fields='size').data.objects
             for obj in data:
                 print(obj.name)
-                obj_tree_item = QTreeWidgetItem(self.obj_tree)
+                obj_tree_item = TreeWidgetItem(self.obj_tree)
                 obj_tree_item.setText(0, obj.name)
                 byte_type_pointer = 0
                 byte_size = obj.size/1024.0
@@ -551,7 +554,7 @@ class CentralWidget(QWidget):
                 obj_tree_item.setText(1, "{} {}".format(str(byte_size), byte_type[byte_type_pointer]))
                 obj_tree_item.setText(2, str(obj.size))
         else:
-            tree_item = QTreeWidgetItem(self.obj_tree)
+            tree_item = TreeWidgetItem(self.obj_tree)
             tree_item.setText(0, "No bucket selected")
             tree_item.setTextColor(0, QColor(220,220,220))
             tree_item.setDisabled(True)
@@ -571,7 +574,7 @@ class CentralWidget(QWidget):
         """
         tree_widget = Tree()
         tree_widget.setHeaderLabel(header)
-        tree_item = QTreeWidgetItem(tree_widget)
+        tree_item = TreeWidgetItem(tree_widget)
         tree_item.setText(0, text)
         tree_item.setTextColor(0, QColor(220,220,220))
         tree_item.setDisabled(True)
@@ -593,120 +596,11 @@ class CreateBucketForm(QDialog):
         layout.addWidget(self.button)
         self.setLayout(layout)
 
-class Tree(QTreeWidget):
-    def __init__(self, accept_drop=False, bucket_name=None, oci_manager=None):
-        """
-        Tree is a widget for displaying object storage information for compartments, buckets, and objects.
-        This especially important for the object tree as the widget has functionality to perform drag and drop uploads
-
-        :param accept_drop: Enable drag and drop events
-        :type accept_drop: boolean
-        :param bucket_name: The name of the bucket for an object tree
-        :type bucket_name: string
-        :param oci_manager: The OCI manager used by the main application
-        :type: oci_manager :class: 'oci_manager.oci_manager'
-        """
-        super(Tree, self).__init__()
-        
-        self.setContextMenuPolicy(Qt.CustomContextMenu)
-        
-        self.accept_drop = accept_drop
-        if accept_drop:
-            self.customContextMenuRequested.connect(self.object_context_menu)
-            self.setAcceptDrops(accept_drop)
-            self.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.bucket_name = bucket_name
-        self.oci_manager = oci_manager
-
-    def object_tree_init(self):
-        self.customContextMenuRequested.connect(self.object_context_menu)
-        self.setAcceptDrops(True)
-        self.setSelectionMode(QAbstractItemView.ExtendedSelection)
-
-    def dragEnterEvent(self, e):
-        if e.mimeData().hasUrls():
-            e.acceptProposedAction()
-        else:
-            e.ignore()
-    
-    def dragMoveEvent(self, e):
-        if e.mimeData().hasUrls():
-            e.acceptProposedAction()
-        else:
-            e.ignore()
-    
-    def object_context_menu(self):
-        """
-        Context menu when the object tree is right clicked
-        """
-        if self.accept_drop and self.selectedItems():
-            menu = QMenu(self)
-            copy_action = menu.addAction("Copy")
-            download_action = menu.addAction("Download")
-            rename_action = menu.addAction("Rename")
-            delete_action = menu.addAction("Delete")
-            delete_action.triggered.connect(self.delete_objects)
-            download_action.triggered.connect(self.download_objects)
-            menu.exec_(QCursor.pos())
-    
-    def download_objects(self):
-        objects = [item.text(0) for item in self.selectedItems()]
-        filesizes = [(int(item.text(2)), item.text(1).split(" ")) for item in self.selectedItems()]
-        self.parentWidget().download_files(objects, filesizes, self.bucket_name)
-
-    
-    def delete_objects(self):
-        items = self.selectedItems()
-        for item in items:
-            self.oci_manager.delete_object(self.bucket_name, item.text(0))
-            self.takeTopLevelItem(self.indexOfTopLevelItem(item))
-
-    def dropEvent(self, e):
-        """
-        If the event has urls (such as dropped files), and the class is given an OCI manager and and bucket name, upload the files to the bucket
-
-        TODO: Use signals/slots
-        """
-        if self.accept_drop:
-            print(e.mimeData().urls())
-            files = []
-
-            for url in e.mimeData().urls():
-                file = url.toLocalFile()
-
-                if os.path.isfile(file):
-                    files.append(file)
-                    
-                elif os.path.isdir(file):
-                    root_dir = True
-                    for dir, _, filenames in os.walk(file):
-                        for filename in filenames:
-                            subfile = "{}/{}".format(dir, filename) if not root_dir else "{}{}".format(dir, filename)
-                            files.append(subfile)
-                        root_dir = False
-
-            self.parentWidget().upload_files((files, "All files"), self.bucket_name)
-    
-    def file_uploaded(self, filename, filesize):
-        """
-        TODO: Return some information when a file upload job completes
-        """
-        print(filename, filesize, "Uploaded")
-        obj_tree_item = QTreeWidgetItem(self)
-        obj_tree_item.setText(0, filename)
-        obj_tree_item.setText(1, filesize)
-
-        return None
-    
-    def toggle(self):
-        if self.isVisible():
-            self.hide()
-        else:
-            self.show()
 
 class MainMenu(QMenuBar):
 
     toggle_compartment = Signal()
+    upload_files = Signal()
 
     def __init__(self, config_window=None):
         """
@@ -725,7 +619,8 @@ class MainMenu(QMenuBar):
             action.setMenuRole(QAction.ApplicationSpecificRole)
         
         self.file_menu = self.addMenu('&File')
-        self.file_menu.addAction("Upload File(s)")
+        self.upload_action = self.file_menu.addAction("Upload File(s)")
+        # self.file_menu.triggered.connect(self.upload_file_handler)
         self.edit_menu = self.addMenu('&Edit')
         profile_action = self.edit_menu.addAction("Profile Settings")
         profile_action.triggered.connect(self.settings)
@@ -757,6 +652,9 @@ class MainMenu(QMenuBar):
         Change the profile
         """
         self.parentWidget().change_profile(new_profile)
+    
+    def upload_file_handler(self):
+        self.upload_files.emit()
 
 
 
