@@ -1,2 +1,1 @@
-# object-storage-desktop
-Desktop application for Oracle Cloud Infrastructure Object Storage
+## A desktop application for Oracle Cloud Infrastructure's Object Storage!
