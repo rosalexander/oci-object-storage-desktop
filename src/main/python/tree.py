@@ -1,6 +1,6 @@
 from PySide2.QtCore import Qt, Signal, QSortFilterProxyModel
 from PySide2.QtGui import QColor, QCursor
-from PySide2.QtWidgets import QWidget, QMainWindow, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QTreeWidget, QTreeWidgetItem, QDialogButtonBox, QDialog, QLineEdit, QAbstractItemView, QMenuBar, QMenu, QAction, QDialog, QMessageBox, QInputDialog
+from PySide2.QtWidgets import QWidget, QMainWindow, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QTreeWidget, QTreeWidgetItem, QDialogButtonBox, QDialog, QLineEdit, QAbstractItemView, QMenuBar, QMenu, QAction, QDialog, QMessageBox, QInputDialog, QLayout
 from rename import RenameWindow
 import os
 
@@ -57,7 +57,7 @@ class Tree(QTreeWidget):
         selected_items = self.selectedItems()
         if self.accept_drop and selected_items:
             menu = QMenu(self)
-            copy_action = menu.addAction("Copy")
+            # copy_action = menu.addAction("Copy")
             download_action = menu.addAction("Download")
             rename_action = menu.addAction("Rename")
             if len(selected_items) > 1:
@@ -81,6 +81,7 @@ class Tree(QTreeWidget):
         delete_confirm.setText("Are you sure you want to delete " + (items[0].text(0) if len(items) == 1 else (str(len(items))) + " items")  + "?")
         delete_confirm.setStandardButtons(QMessageBox.Cancel | QMessageBox.Ok)
         delete_confirm.setDefaultButton(QMessageBox.Cancel)
+        delete_confirm.layout().setSizeConstraint(QLayout.SetMinimumSize)
         ret = delete_confirm.exec_()
         if ret == QMessageBox.Ok:
             for item in items:

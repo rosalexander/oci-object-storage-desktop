@@ -3,11 +3,12 @@ import os
 import configparser
 import time
 from PySide2.QtCore import Qt, Signal, QThread
-from PySide2.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QDialogButtonBox, QDialog, QProgressBar, QLabel, QSizePolicy
+from PySide2.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QDialogButtonBox, QDialog, QProgressBar, QLabel, QSizePolicy, QFrame
+from PySide2.QtGui import QIcon
 
 byte_type = {'KB':0, 'MB':1, 'GB':2, 'TB':3, 'PB':4}
 
-class ProgressWindow(QDialog):
+class ProgressWindow(QWidget):
 
     cancel_signal = Signal(int)
     
@@ -28,7 +29,10 @@ class ProgressWindow(QDialog):
 
     def initUI(self):
         self.file_label = QLabel()
-
+        # self.file_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        # self.file_label.setFrameShape(QFrame.Box)
+        # self.file_label.setAlignment(Qt.AlignHCenter)
+        # self.file_label.setStyleSheet("border-style: solid; border-width: 2px;")
         if self.download:
             self.setWindowTitle('Downloading Files ({}/{})'.format(self.files_uploaded, len(self.files[0])))
             self.file_label.setText("Downloading {}".format(self.files[0][self.files_len - 1].split('/')[-1]))
@@ -61,7 +65,10 @@ class ProgressWindow(QDialog):
         self.progress = QProgressBar(self)
         self.progress.setMaximum(self.max)
         self.progress.setValue(0)
-
+        
+        # print(self.file_label.textFormat(), self.file_label.lineWidth(), self.file_label.margin(), self.file_label.frameSize())
+        # self.file_label.show()
+        # self.file_label.setBuddy(self.progress)
         self.layout.addWidget(self.file_label)
         self.layout.addWidget(self.progress)
         self.layout.addWidget(self.size_label)
@@ -72,7 +79,6 @@ class ProgressWindow(QDialog):
         self.retry_label.setStyleSheet("QLabel {color: red; }")
         self.layout.addWidget(self.retry_label)
         self.retry_label.setVisible(False)
-        self.layout.setSpacing(0)
         self.setLayout(self.layout)
         
     

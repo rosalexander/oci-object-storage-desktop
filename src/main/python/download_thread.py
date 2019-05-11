@@ -129,21 +129,19 @@ class DownloadThread(QThread):
         """
 
         while self.objects or self.current_download:
-            print(self.objects, "test")
             object_name = self.objects.pop()
-            response = self.os_client.get_object(self.namespace, self.bucket_name, object_name)
-            print("test2")
+            try:
+                response = self.os_client.get_object(self.namespace, self.bucket_name, object_name)
+            except:
+                self.connection_failed()
+                print("GET request to object failed")
+                break
             print(response.status, response.data, self.threadactive)
             if response.status == 200 and self.threadactive:
-                print("test3")
                 object_size = response.headers['Content-Length']
-
                 self.current_download = {"object_name":object_name, "file_path":self.path + object_name, "object_size": object_size}
-
-                try:
-                    path = self.get_path(object_name)
-                    # download_resp = self.download_file(object_name, response)
-                        
+                path = self.get_path(object_name)
+                try:                        
                     self.f = open(path + ".tmp","wb+")
                     for chunk in response.data.iter_content(chunk_size=8192):
                         if self.threadactive:
@@ -157,10 +155,14 @@ class DownloadThread(QThread):
                 except:
                     if self.threadactive:
                         self.connection_failed()
+                        self.f.close()
                     break
     
                 self.file_downloaded.emit(object_name, object_size)
                 self.current_download = None
+            else:
+                self.connection_failed()
+                break
 
         if not self.objects and not self.current_download:
             self.all_files_downloaded.emit(self.thread_id)

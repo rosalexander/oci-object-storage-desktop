@@ -1,7 +1,7 @@
 from fbs_runtime.application_context import ApplicationContext, cached_property
 from PySide2.QtCore import Qt, Signal
 from PySide2.QtGui import QColor, QCursor
-from PySide2.QtWidgets import QWidget, QMainWindow, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QTreeWidget, QTreeWidgetItem, QDialogButtonBox, QDialog, QLineEdit, QAbstractItemView, QMenuBar, QMenu, QAction, QDialog, QMessageBox, QInputDialog
+from PySide2.QtWidgets import QWidget, QMainWindow, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QTreeWidget, QTreeWidgetItem, QDialogButtonBox, QDialog, QLineEdit, QAbstractItemView, QMenuBar, QMenu, QAction, QDialog, QMessageBox, QInputDialog, QLabel
 from oci_manager import oci_manager, UploadId
 from config import ConfigWindow
 from progress import ProgressWindow
@@ -284,7 +284,7 @@ class CentralWidget(QWidget):
         upload_thread.upload_failed.connect(progress_thread.retry_handler)
         progress_thread.cancel_signal.connect(self.thread_cancelled)
         progress_thread.retry.clicked.connect(upload_thread.start)
-
+        # progress_thread.setMinimumHeight(50)
         self.progress_threads[c] = progress_thread
         self.upload_threads[c] = upload_thread
 
@@ -615,10 +615,14 @@ class MainMenu(QMenuBar):
         # self.config_window.setParent(self)
         self.setNativeMenuBar(True)
         test_menu = self.addMenu('')
-        for text in ["About", "Preferences"]:
-            action = test_menu.addAction(text)
-            action.setMenuRole(QAction.ApplicationSpecificRole)
+        # for text in ["About", "Preferences"]:
+        #     action = test_menu.addAction(text)
+        #     action.setMenuRole(QAction.ApplicationSpecificRole)
         
+        self.about_action = test_menu.addAction("About")
+        self.about_action.triggered.connect(self.about)
+
+
         self.file_menu = self.addMenu('&File')
         self.upload_action = self.file_menu.addAction("Upload File(s)")
         # self.file_menu.triggered.connect(self.upload_file_handler)
@@ -639,7 +643,26 @@ class MainMenu(QMenuBar):
         self.object_view.setCheckable(True)
         self.object_view.setChecked(True)
 
-    
+    def about(self):
+        self.about_box = QDialog()
+        self.about_box.setWindowTitle("About")
+        text = QLabel()
+        text.setText\
+        ("This is an UNOFFICIAL desktop client to interact with \
+        \nthe Oracle Cloud Infrastructure Object Storage service.\
+        \nPlease use at your own discretion.\
+        \nThis application is not affiliated with Oracle.\
+        \nNot available for resale or commercial use.\
+        \n\
+        \nWritten by Alexander Ros\
+        \n\
+        \n Version 0.1.0")
+        text.setAlignment(Qt.AlignHCenter)
+        layout = QVBoxLayout()
+        layout.addWidget(text)
+        self.about_box.setLayout(layout)
+        self.about_box.show()
+
     def settings(self):
         """
         Slot to display the ConfigWindow widget when the Profile Settings action is triggered
