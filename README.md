@@ -15,3 +15,9 @@ This application is licensed under LGPLv3
 See [LICENSE](https://github.com/rosalexander/oci-object-storage-desktop/blob/master/LICENSE) for more details
 
 This application makes use of the [PySide2](https://wiki.qt.io/Qt_for_Python) module which is available under under LGPLv3, the [fman build system](https://github.com/mherrmann/fbs) which available under GPL, and the [OCI Python SDK](https://github.com/oracle/oci-python-sdk) which is dual licensed under the Universal Permissive License 1.0 and the Apache License 2.0.
+
+## Current Issues & Future Plans
+
+
+
+If there is a demand to further development of this application, I would 
