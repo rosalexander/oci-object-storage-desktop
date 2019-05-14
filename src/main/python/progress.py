@@ -137,6 +137,9 @@ class ProgressWindow(QWidget):
         print("Retry handler")
         self.retry_label.setVisible(True)
         self.retry.setEnabled(True)
+        if self.download:
+            self.count = 0
+            self.progress.setValue(self.count)
 
 class TestProgress(QThread):
 

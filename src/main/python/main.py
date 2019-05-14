@@ -245,6 +245,8 @@ class CentralWidget(QWidget):
         download_thread.bytes_downloaded.connect(progress_thread.set_progress)
         download_thread.all_files_downloaded.connect(self.delete_threads)
         progress_thread.cancel_signal.connect(self.thread_cancelled)
+        download_thread.download_failed.connect(progress_thread.retry_handler)
+        progress_thread.retry.clicked.connect(download_thread.start)
 
         self.progress_threads[c] = progress_thread
         self.upload_threads[c] = download_thread

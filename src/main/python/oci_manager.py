@@ -77,7 +77,7 @@ class oci_manager():
             self.tenancy = None
         else:
             self.id_client = oci.identity.IdentityClient(self.config)
-            self.os_client = oci.object_storage.ObjectStorageClient(self.config)
+            self.os_client = oci.object_storage.ObjectStorageClient(self.config, timeout=10)
             self.tenancy = self.config['tenancy']
 
         try:

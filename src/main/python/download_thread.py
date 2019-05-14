@@ -128,8 +128,13 @@ class DownloadThread(QThread):
 
         """
 
+
         while self.objects or self.current_download:
-            object_name = self.objects.pop()
+            if self.current_download:
+                object_name = self.current_download["object_name"]
+            else:
+                object_name = self.objects.pop()
+                
             try:
                 response = self.os_client.get_object(self.namespace, self.bucket_name, object_name)
             except:
@@ -163,6 +168,9 @@ class DownloadThread(QThread):
             else:
                 self.connection_failed()
                 break
+
+        
+        
 
         if not self.objects and not self.current_download:
             self.all_files_downloaded.emit(self.thread_id)
