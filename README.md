@@ -48,7 +48,6 @@ This application makes use of the [PySide2](https://wiki.qt.io/Qt_for_Python) mo
 
 Here are some issues I have encountered while developing this application that you should be aware of
 * Hidden files and folders (such as files or folder that start with '.' e.g. '.git') will be uploaded to Object Storage. 
-* If the connection fails during a download, the download will hang indefinitely. This is because when the OCI Python SDK makes a get request for the object, no timeout is set.
 * The label widget in charge of adding text lines to windows have very large paddings and may cause text to clip out of the window.
 
 If there is a demand to further development of this application, I would add these features
