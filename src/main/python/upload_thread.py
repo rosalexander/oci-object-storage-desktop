@@ -88,8 +88,11 @@ class UploadThread(QThread):
         :param file: The absolute path of the file
         :type file: string
         """
-
-        response = self.upload_manager.upload_file(self.namespace, self.bucket_name, object_name, file, progress_callback=self.progress_callback, mixin=self.upload_id_manager, part_size=10485760)
+        content_type = guess_type(object_name)[0]
+        if content_type == None:
+            content_type = 'application/octet-stream'
+        print(content_type)
+        response = self.upload_manager.upload_file(self.namespace, self.bucket_name, object_name, file, progress_callback=self.progress_callback, mixin=self.upload_id_manager, part_size=10485760, content_type=content_type)
         return response
     
     def run(self):
@@ -109,6 +112,7 @@ class UploadThread(QThread):
 
                 if os.path.isfile(filename) and self.threadactive:
                     self.current_upload = {"object_name":filename.split('/')[-1], "file_path":filename, "filesize": filesize, "filesize_bits": filesize_bits[0]}
+                    
                     try:
                         response = self.upload_file(filename, filename.split('/')[-1])
                     except:
