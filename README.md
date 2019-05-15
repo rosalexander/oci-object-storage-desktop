@@ -6,9 +6,9 @@ This is an UNOFFICIAL desktop client to interact with the Oracle Cloud Infrastru
 
 ## Download
 
-[Windows Installer Download](https://objectstorage.us-ashburn-1.oraclecloud.com/n/orasenatdpltoci02/b/object-storage-desktop/o/OCI%20Object%20Storage.dmg)
+[Windows Installer Download](https://objectstorage.us-ashburn-1.oraclecloud.com/n/orasenatdpltoci02/b/object-storage-desktop/o/OCI%20Object%20StorageSetup.exe)
 
-[macOS Installer Download](https://objectstorage.us-ashburn-1.oraclecloud.com/n/orasenatdpltoci02/b/object-storage-desktop/o/OCI%20Object%20StorageSetup.exe)
+[macOS Installer Download](https://objectstorage.us-ashburn-1.oraclecloud.com/n/orasenatdpltoci02/b/object-storage-desktop/o/OCI%20Object%20Storage.dmg)
 
 NOTE: This application was only tested with a MacBook Pro 2018 running High Sierra and a Windows 10 Enterprise Virtual Machine. This application is not guaranteed to run on all variations of Windows and macOS.
 
