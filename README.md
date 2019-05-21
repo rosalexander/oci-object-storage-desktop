@@ -38,7 +38,7 @@ Fill in the required information and press Save. If the information is correct a
 
 ## License
 
-This application is licensed under LGPLv3
+This application is licensed under GPLv3
 
 See [LICENSE](https://github.com/rosalexander/oci-object-storage-desktop/blob/master/LICENSE) for more details
 
