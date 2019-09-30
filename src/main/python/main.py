@@ -1,4 +1,4 @@
-from fbs_runtime.application_context import ApplicationContext, cached_property
+from fbs_runtime.application_context.PySide2 import ApplicationContext, cached_property
 from PySide2.QtCore import Qt, Signal
 from PySide2.QtGui import QColor, QCursor
 from PySide2.QtWidgets import QWidget, QMainWindow, QPushButton, QVBoxLayout, QHBoxLayout, QFileDialog, QTreeWidget, QTreeWidgetItem, QDialogButtonBox, QDialog, QLineEdit, QAbstractItemView, QMenuBar, QMenu, QAction, QDialog, QMessageBox, QInputDialog, QLabel
@@ -12,13 +12,25 @@ from rename import RenameWindow
 from tree import Tree, TreeWidgetItem
 import sys
 import os
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+f_handler = logging.FileHandler(os.path.expanduser(os.path.join('~', '.oci', 'object_storage.log')))
+f_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+f_handler.setFormatter(f_format)
+logger.addHandler(f_handler)
 
 class AppContext(ApplicationContext):
     def run(self):
-        stylesheet = self.get_resource('styles.qss')
-        self.app.setStyleSheet(open(stylesheet).read())
-        self.window.show()
-        return self.app.exec_()
+        try:
+            # stylesheet = self.get_resource('styles.qss')
+            #self.app.setStyleSheet(open(stylesheet).read())
+            self.window.show()
+            return self.app.exec_()
+        except Exception as e:
+            logger.exception("Exception occured")
+            raise e
     @cached_property
     def window(self):
         return MainWindow(self.menu_bar, self.central, self.config)
@@ -265,7 +277,6 @@ class CentralWidget(QWidget):
         :param bucket_name: The name of bucket to upload file(s) to in OCI
         :type bucket_name: string
 
-        TODO: Progress window is bigger than it should be, but functional
         """
         
         filesizes = []
@@ -685,6 +696,8 @@ class MainMenu(QMenuBar):
 
 
 if __name__ == '__main__':
+    logger.info("Application starting")
     appctxt = AppContext()
     exit_code = appctxt.run()
+    logger.info("Application closing")
     sys.exit(exit_code)

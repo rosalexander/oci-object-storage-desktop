@@ -8,6 +8,14 @@ from util import get_filesize
 from mimetypes import guess_type
 import sys
 import os
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+f_handler = logging.FileHandler(os.path.expanduser(os.path.join('~', '.oci', 'object_storage.log')))
+f_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+f_handler.setFormatter(f_format)
+logger.addHandler(f_handler)
 
 class UploadThread(QThread):
 
@@ -55,7 +63,7 @@ class UploadThread(QThread):
     
     def retry(self):
         self.upload_manager.resume_upload_file(self.namespace, self.bucket_name, self.current_upload["object_name"],\
-                self.current_upload["file_path"], self.upload_id, progress_callback=self.progress_callback, mixin=self.upload_id_manager, part_size=10485760)
+                self.current_upload["file_path"], self.upload_id, progress_callback=self.progress_callback, mixin=self.upload_id_manager)
         self.file_uploaded.emit(self.current_upload["object_name"], self.current_upload["filesize"], self.bucket_name, self.current_upload["filesize_bits"])
     
     def connection_failed(self):
@@ -115,7 +123,8 @@ class UploadThread(QThread):
                     
                     try:
                         response = self.upload_file(filename, filename.split('/')[-1])
-                    except:
+                    except Exception as e:
+                        logger.exception("Exception occured")
                         if self.threadactive:
                             self.connection_failed()
                         break
@@ -133,7 +142,8 @@ class UploadThread(QThread):
                             self.current_upload = {"object_name":subfile[dir_length:], "file_path":subfile, "filesize": filesize}
                             try:
                                 response = self.upload_file(subfile, subfile[dir_length:])
-                            except:
+                            except Exception as e:
+                                logger.exception("Exception occured")
                                 if self.threadactive:
                                     self.connection_failed()
                                 break
