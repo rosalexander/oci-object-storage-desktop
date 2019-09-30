@@ -6,9 +6,9 @@ This is an UNOFFICIAL desktop client to interact with the Oracle Cloud Infrastru
 
 ## Download
 
-[Windows Installer Download](https://objectstorage.us-ashburn-1.oraclecloud.com/n/orasenatdpltoci02/b/object-storage-desktop/o/OCI%20Object%20Storage.dmg)
+[Windows Installer Download](https://objectstorage.us-ashburn-1.oraclecloud.com/n/orasenatdpltoci02/b/object-storage-desktop/o/OCI%20Object%20StorageSetup.exe)
 
-[macOS Installer Download](https://objectstorage.us-ashburn-1.oraclecloud.com/n/orasenatdpltoci02/b/object-storage-desktop/o/OCI%20Object%20StorageSetup.exe)
+[macOS Installer Download](https://objectstorage.us-ashburn-1.oraclecloud.com/n/orasenatdpltoci02/b/object-storage-desktop/o/OCI%20Object%20Storage.dmg)
 
 NOTE: This application was only tested with a MacBook Pro 2018 running High Sierra and a Windows 10 Enterprise Virtual Machine. This application is not guaranteed to run on all variations of Windows and macOS.
 
@@ -38,7 +38,7 @@ Fill in the required information and press Save. If the information is correct a
 
 ## License
 
-This application is licensed under LGPLv3
+This application is licensed under GPLv3
 
 See [LICENSE](https://github.com/rosalexander/oci-object-storage-desktop/blob/master/LICENSE) for more details
 
@@ -47,8 +47,8 @@ This application makes use of the [PySide2](https://wiki.qt.io/Qt_for_Python) mo
 ## Current Issues & Future Plans
 
 Here are some issues I have encountered while developing this application that you should be aware of
-* Hidden files and folders (such as files or folder that start with '.' e.g. '.git') will be uploaded to Object Storage. 
-* If the connection fails during a download, the download will hang indefinitely. This is because when the OCI Python SDK makes a get request for the object, no timeout is set.
+* Uploading install/applications files (.exe, .dmg, .app files) is not supported and will cause unexpected behavior. 
+* Hidden files and folders (such as files or folder that start with '.' e.g. '.git') will be uploaded to Object Storage if inside a folder. 
 * The label widget in charge of adding text lines to windows have very large paddings and may cause text to clip out of the window.
 
 If there is a demand to further development of this application, I would add these features
