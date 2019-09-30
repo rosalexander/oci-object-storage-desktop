@@ -49,7 +49,7 @@ This application makes use of the [PySide2](https://wiki.qt.io/Qt_for_Python) mo
 Here are some issues I have encountered while developing this application that you should be aware of
 * Uploading install/applications files (.exe, .dmg, .app files) is not supported and will cause unexpected behavior. 
 * Hidden files and folders (such as files or folder that start with '.' e.g. '.git') will be uploaded to Object Storage if inside a folder. 
-* The label widget in charge of adding text lines to windows have very large paddings and may cause text to clip out of the window.
+
 
 If there is a demand to further development of this application, I would add these features
 * Set visibility of buckets
